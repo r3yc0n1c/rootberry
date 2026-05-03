@@ -78,20 +78,24 @@ export default class FarmScene extends Phaser.Scene {
 
   syncWorld() {
     const world = NetworkManager.worldState
-    if (!world || !world.Players) return
 
-    const localPlayerId = Object.keys(world.Players)[0]
+    if (!world || !world.players) return
 
-    Object.values(world.Players).forEach((p: any) => {
+    const localPlayerId = Object.keys(world.players)[0]
+
+    Object.values(world.players).forEach((p: any) => {
       // Multiply server coordinates by TILE and SCALE
       const targetX = p.x * TILE * SCALE;
       const targetY = p.y * TILE * SCALE;
 
       if (!this.players.has(p.id)) {
+        // Create new Player instance
         const player = new Player(this, targetX, targetY, p.id)
+
+        // Add to scene and scale to match tiles
         this.add.existing(player)
+        player.setScale(SCALE)
         player.setDepth(10)
-        player.setScale(SCALE) // Scale the player sprite too
         
         this.players.set(p.id, player)
 
@@ -110,9 +114,9 @@ export default class FarmScene extends Phaser.Scene {
 
   update() {
     const world = NetworkManager.worldState
-    if (!world || !world.Players || !this.cursors) return
+    if (!world || !world.players || !this.cursors) return
 
-    const players = Object.values(world.Players)
+    const players = Object.values(world.players)
     if (players.length === 0) return
 
     // Identify local player (assuming index 0 is 'me')
@@ -120,29 +124,28 @@ export default class FarmScene extends Phaser.Scene {
     let x = me.x
     let y = me.y
     let moved = false
+    let direction = ''
 
     if (Phaser.Input.Keyboard.JustDown(this.cursors.left!)) {
-      x--
-      moved = true
+      x--; moved = true; direction = 'left';
     } else if (Phaser.Input.Keyboard.JustDown(this.cursors.right!)) {
-      x++
-      moved = true
-    }
-
-    if (Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
-      y--
-      moved = true
+      x++; moved = true; direction = 'right';
+    } else if (Phaser.Input.Keyboard.JustDown(this.cursors.up!)) {
+      y--; moved = true; direction = 'up';
     } else if (Phaser.Input.Keyboard.JustDown(this.cursors.down!)) {
-      y++
-      moved = true
+      y++; moved = true; direction = 'down';
     }
 
     if (moved) {
-      NetworkManager.send({
-        type: 'move',
-        x,
-        y,
-      })
+        // 1. Immediately update the local sprite's animation for responsiveness
+        const localPlayerId = Object.keys(world.players)[0];
+        const localSprite = this.players.get(localPlayerId);
+        if (localSprite) {
+            localSprite.updateDirection(direction);
+        }
+
+        // 2. Send move to server
+        NetworkManager.send({ type: 'move', x, y });
     }
   }
 }

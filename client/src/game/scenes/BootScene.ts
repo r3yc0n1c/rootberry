@@ -17,31 +17,26 @@ export default class BootScene extends Phaser.Scene {
       '/src/assets/crops/Crops_Tileset.png'
     )
 
-    // Load bunny spritesheets
     this.load.spritesheet(
       'bunny_idle',
       '/src/assets/bunny/IDLE/Bunny_Idle.png',
       {
-        frameWidth: 32,
-        frameHeight: 32,
+        frameWidth: 48,
+        frameHeight: 48,
       }
     ).on('fileerror', (file: any) => {
       console.error('Failed to load bunny_idle spritesheet:', file)
-    }).on('load', () => {
-      console.log('Bunny idle spritesheet loaded successfully')
     })
 
     this.load.spritesheet(
       'bunny_run',
       '/src/assets/bunny/RUN/Bunny_Run.png',
       {
-        frameWidth: 32,
-        frameHeight: 32,
+        frameWidth: 48,
+        frameHeight: 48,
       }
     ).on('fileerror', (file: any) => {
       console.error('Failed to load bunny_run spritesheet:', file)
-    }).on('load', () => {
-      console.log('Bunny run spritesheet loaded successfully')
     })
 
     // Error handling
@@ -55,6 +50,22 @@ export default class BootScene extends Phaser.Scene {
   }
 
   create() {
+    // Row 0 = Up, Row 1 = Right, Row 2 = Left, Row 3 = Down
+    const directions = ['up', 'right', 'left', 'down'];
+    const framesPerDirection = 5;
+
+    directions.forEach((dir, index) => {
+      this.anims.create({
+        key: `bunny-idle-${dir}`,
+        frames: this.anims.generateFrameNumbers('bunny_idle', {
+          start: index * framesPerDirection,
+          end: (index * framesPerDirection) + (framesPerDirection - 1)
+        }),
+        frameRate: 6,
+        repeat: -1
+      });
+    });
+
     this.scene.start('FarmScene')
     this.scene.launch('UIScene')
   }
