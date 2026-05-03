@@ -1,0 +1,24 @@
+{
+    "activeFile": "client/src/assets/tiles/grass.tsx",
+    "expandedProjectPaths": [
+    ],
+    "fileStates": {
+        "client/src/assets/tiles/grass.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 3
+        }
+    },
+    "last.imagePath": "D:/rootberry/client/src/assets/tiles",
+    "openFiles": [
+        "client/src/assets/tiles/grass.tsx"
+    ],
+    "project": "rootberry.tiled-project",
+    "recentFiles": [
+        "client/src/assets/tiles/grass.tsx"
+    ],
+    "tileset.lastUsedFormat": "tsx",
+    "tileset.tileSize": {
+        "height": 16,
+        "width": 16
+    }
+}

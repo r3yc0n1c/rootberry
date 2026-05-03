@@ -6,7 +6,6 @@ func StartRoomLoop(room *Room) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 
 	for range ticker.C {
-
 		room.Mutex.Lock()
 
 		for y := 0; y < room.World.Height; y++ {

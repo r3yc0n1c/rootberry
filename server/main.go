@@ -7,6 +7,7 @@ import (
 )
 
 func main() {
+	// http.Handle("/", http.FileServer(http.Dir("../client")))
 	http.HandleFunc("/ws", ws.HandleConnection)
 
 	log.Println("🌱 RootBerry server running on :8080")

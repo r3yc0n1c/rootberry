@@ -7,10 +7,10 @@ type Tile struct {
 }
 
 type World struct {
-	Width  int
-	Height int
-	Tiles  [][]*Tile
-	Players map[string]*Player
+	Width  int       			`json:"width"`
+	Height int       			`json:"height"`
+	Tiles  [][]*Tile  			`json:"tiles"`
+	Players map[string]*Player 	`json:"players"`
 }
 
 func NewWorld(w, h int) *World {

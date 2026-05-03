@@ -1,12 +1,27 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>RootBerry</title>
-</head>
-<body>
-  <canvas id="game" width="640" height="640"></canvas>
-  <script src="network.js"></script>
-  <script src="renderer.js"></script>
-  <script src="game.js"></script>
-</body>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1d212d" />
+    <title>RootBerry</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #1d212d;
+      }
+      #app {
+        width: 100vw;
+        height: 100vh;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>

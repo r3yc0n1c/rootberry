@@ -38,6 +38,9 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	initData, _ := json.Marshal(initMsg)
 	conn.WriteMessage(websocket.TextMessage, initData)
 
+	// Send initial world state
+	room.Broadcast()
+
 	defer func() {
 		room.RemoveClient(id)
 		conn.Close()
@@ -53,8 +56,6 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 		var m Message
 		json.Unmarshal(msg, &m)
 
-		log.Printf("[ROOM %s] Player %s → %+v\n", room.ID, player.ID, m)
-
 		handleAction(room, player, m)
 	}
 }
@@ -66,22 +67,26 @@ func handleAction(room *game.Room, p *game.Player, m Message) {
 	switch m.Type {
 
 	case "move":
+		p.State = "run"
 		p.X = m.X
 		p.Y = m.Y
 
 	case "till":
 		tile := room.World.Tiles[m.Y][m.X]
 		tile.Type = "tilled"
+		p.State = "hoe"
 
 	case "plant":
 		tile := room.World.Tiles[m.Y][m.X]
 		if tile.Type == "tilled" {
 			tile.Crop = game.NewCrop("carrot")
 		}
+		p.State = "idle"
 
 	case "water":
 		tile := room.World.Tiles[m.Y][m.X]
 		tile.Watered = true
+		p.State = "water"
 
 	case "harvest":
 		tile := room.World.Tiles[m.Y][m.X]
@@ -90,5 +95,6 @@ func handleAction(room *game.Room, p *game.Player, m Message) {
 			tile.Crop = nil
 			tile.Type = "grass"
 		}
+		p.State = "idle"
 	}
 }
