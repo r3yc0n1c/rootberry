@@ -43,24 +43,10 @@ func (r *Room) AddClient(id string, conn *websocket.Conn) *Player {
 	startX := r.World.Width / 2
 	startY := r.World.Height / 2
 	
-	// If center is occupied, find next available spot
-	if len(r.World.Players) > 0 {
-		for y := startY; y < r.World.Height; y++ {
-			for x := startX; x < r.World.Width; x++ {
-				occupied := false
-				for _, p := range r.World.Players {
-					if p.X == x && p.Y == y {
-						occupied = true
-						break
-					}
-				}
-				if !occupied {
-					startX, startY = x, y
-					break
-				}
-			}
-		}
-	}
+	// Add a small random offset (e.g., -2 to +2 tiles) 
+    // so they aren't all exactly on top of each other but still near the center
+    startX += r.rng.Intn(5) - 2
+    startY += r.rng.Intn(5) - 2
 
 	player := &Player{ID: id, X: startX, Y: startY, Color: color, State: "idle", Direction: "down"}
 	r.World.Players[id] = player
