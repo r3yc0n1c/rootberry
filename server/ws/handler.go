@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const DEBUG = true
+
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
@@ -53,10 +55,14 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		log.Printf("[server] received message: %s", string(msg))
+
 		var m Message
 		json.Unmarshal(msg, &m)
 
 		handleAction(room, player, m)
+		
+		log.Printf("[%s] state: %d, %d \n", m.Type, m.X, m.Y)
 	}
 }
 
@@ -67,14 +73,22 @@ func handleAction(room *game.Room, p *game.Player, m Message) {
 	switch m.Type {
 
 	case "move":
-		p.State = "run"
-		p.X = m.X
-		p.Y = m.Y
+		if DEBUG {
+			log.Printf("[Move Request] Player %s to X:%d, Y:%d", p.ID, m.X, m.Y)
+		}
+		
+		// Match the client: only allow tiles 1 through 98
+		if m.X > 0 && m.X < 99 && m.Y > 0 && m.Y < 99 {
+			p.X = m.X
+			p.Y = m.Y
+			room.BroadcastLocked()
+		}
 
 	case "till":
 		tile := room.World.Tiles[m.Y][m.X]
 		tile.Type = "tilled"
 		p.State = "hoe"
+		room.BroadcastLocked()
 
 	case "plant":
 		tile := room.World.Tiles[m.Y][m.X]
@@ -82,11 +96,13 @@ func handleAction(room *game.Room, p *game.Player, m Message) {
 			tile.Crop = game.NewCrop("carrot")
 		}
 		p.State = "idle"
+		room.BroadcastLocked()
 
 	case "water":
 		tile := room.World.Tiles[m.Y][m.X]
 		tile.Watered = true
 		p.State = "water"
+		room.BroadcastLocked()
 
 	case "harvest":
 		tile := room.World.Tiles[m.Y][m.X]
@@ -96,5 +112,6 @@ func handleAction(room *game.Room, p *game.Player, m Message) {
 			tile.Type = "grass"
 		}
 		p.State = "idle"
+		room.BroadcastLocked()
 	}
 }

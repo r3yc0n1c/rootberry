@@ -1,19 +1,35 @@
 {
-    "activeFile": "client/src/assets/tiles/grass.tsx",
+    "activeFile": "bunny/RUN/Bunny_Run.tsx",
     "expandedProjectPaths": [
+        "bunny/RUN",
+        ".",
+        "bunny",
+        "bunny/IDLE"
     ],
+    "file.lastUsedOpenFilter": "All Files (*)",
     "fileStates": {
+        "bunny/IDLE/Bunny_Idle.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "bunny/RUN/Bunny_Run.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
         "client/src/assets/tiles/grass.tsx": {
             "scaleInDock": 1,
             "scaleInEditor": 3
         }
     },
-    "last.imagePath": "D:/rootberry/client/src/assets/bunny/IDLE",
+    "last.imagePath": "D:/rootberry/client/src/assets/bunny/RUN",
     "openFiles": [
-        "client/src/assets/tiles/grass.tsx"
+        "bunny/IDLE/Bunny_Idle.tsx",
+        "bunny/RUN/Bunny_Run.tsx"
     ],
     "project": "rootberry.tiled-project",
     "recentFiles": [
+        "bunny/IDLE/Bunny_Idle.tsx",
+        "bunny/RUN/Bunny_Run.tsx",
         "client/src/assets/tiles/grass.tsx"
     ],
     "tileset.lastUsedFormat": "tsx",

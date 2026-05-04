@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 
 export default class Player extends Phaser.GameObjects.Sprite {
   id: string
+  public lastDir: string = 'down'
 
   constructor(
     scene: Phaser.Scene,
@@ -31,11 +32,20 @@ export default class Player extends Phaser.GameObjects.Sprite {
    * Call this when the player moves to change the facing direction
    * @param direction 'up', 'down', 'left', or 'right'
    */
-  updateDirection(direction: string) {
-    const key = `bunny-idle-${direction}`;
+  updateDirection(direction: string, isMoving: boolean) {
+    // Determine if we use 'run' or 'idle' based on the boolean
+    const state = isMoving ? 'run' : 'idle';
+    const key = `bunny-${state}-${direction}`;
 
-    if (this.anims.exists(key) && this.anims.currentAnim?.key !== key) {
-      this.play(key);
+    if (this.scene.anims.exists(key)) {
+      // currentAnim check prevents the animation from restarting every single frame
+      if (this.anims.currentAnim?.key !== key) {
+        console.log(`Switching to: ${key}`); // Debug log to see the switch in console
+        this.play(key, true);
+        this.lastDir = direction;
+      }
+    } else {
+      console.error(`Animation key missing: ${key}`);
     }
   }
 }

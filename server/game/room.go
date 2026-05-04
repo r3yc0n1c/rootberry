@@ -25,7 +25,7 @@ type Room struct {
 func NewRoom(id string) *Room {
 	return &Room{
 		ID:      id,
-		World:   NewWorld(20, 20),
+		World:   NewWorld(100, 100),
 		Clients: make(map[string]*Client),
 		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
@@ -84,10 +84,10 @@ func (r *Room) RemoveClient(id string) {
 func (r *Room) Broadcast() {
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
-	r.broadcastLocked()
+	r.BroadcastLocked()
 }
 
-func (r *Room) broadcastLocked() {
+func (r *Room) BroadcastLocked() {
 	data, _ := json.Marshal(r.World)
 
 	for id, client := range r.Clients {

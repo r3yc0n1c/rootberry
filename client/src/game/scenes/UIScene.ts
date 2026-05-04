@@ -24,7 +24,8 @@ export default class UIScene extends Phaser.Scene {
     const players = Object.values(world.Players)
     if (players.length === 0) return
 
-    const me = players[0] as any
+    const myId = NetworkManager.playerId;
+    const me = players[myId];
 
     this.moneyText.setText(`Money: ${me.money}`)
   }
