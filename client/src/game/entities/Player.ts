@@ -22,7 +22,7 @@ export default class Player extends Phaser.GameObjects.Sprite {
     this.setDepth(10);  // Ensure it's above the grass
 
     // Keep origin at 0.5, 1 so the bunny stands on the grid line
-    this.setOrigin(0.5, 0.9);
+    this.setOrigin(0.5, 0.5);
 
     // Start with the 'down' animation as default
     this.play('bunny-idle-down');
@@ -47,5 +47,20 @@ export default class Player extends Phaser.GameObjects.Sprite {
     } else {
       console.error(`Animation key missing: ${key}`);
     }
+  }
+
+  // Player.ts
+  getFacingTile() {
+    // Convert current pixel position to tile coordinates
+    let tx = Math.floor(this.x / (16 * 2)); // TILE * SCALE
+    let ty = Math.floor(this.y / (16 * 2));
+
+    // Shift target based on direction
+    if (this.lastDir === 'left') tx -= 1;
+    if (this.lastDir === 'right') tx += 1;
+    if (this.lastDir === 'up') ty -= 1;
+    if (this.lastDir === 'down') ty += 1;
+
+    return { x: tx, y: ty };
   }
 }

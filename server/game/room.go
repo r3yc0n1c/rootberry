@@ -2,6 +2,7 @@ package game
 
 import (
 	"encoding/json"
+	"math"
 	"math/rand"
 	"sync"
 	"time"
@@ -22,10 +23,14 @@ type Room struct {
 	rng		*rand.Rand
 }
 
+const VISIBILITY_RADIUS = 25.0 // Tiles
+const WORLD_WIDTH = 40
+const WORLD_HEIGHT = 22
+
 func NewRoom(id string) *Room {
 	return &Room{
 		ID:      id,
-		World:   NewWorld(100, 100),
+		World:   NewWorld(WORLD_WIDTH, WORLD_HEIGHT),
 		Clients: make(map[string]*Client),
 		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
@@ -74,10 +79,26 @@ func (r *Room) Broadcast() {
 }
 
 func (r *Room) BroadcastLocked() {
-	data, _ := json.Marshal(r.World)
-
 	for id, client := range r.Clients {
+		nearbyState := World{
+            Players: make(map[string]*Player),
+        }
+
+		for _, other := range r.World.Players {
+            // Calculate distance between recipient and other players
+            dx := float64(client.Player.X - other.X)
+            dy := float64(client.Player.Y - other.Y)
+            distance := math.Sqrt(dx*dx + dy*dy)
+
+            // Only add to the packet if they are nearby
+            if distance <= VISIBILITY_RADIUS {
+                nearbyState.Players[other.ID] = other
+            }
+        }
+
+		data, _ := json.Marshal(nearbyState)
 		err := client.Conn.WriteMessage(websocket.TextMessage, data)
+
 		if err != nil {
 			client.Conn.Close()
 			delete(r.Clients, id)

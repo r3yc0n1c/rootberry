@@ -11,6 +11,8 @@ import (
 )
 
 const DEBUG = true
+const WORLD_WIDTH = 50
+const WORLD_HEIGHT = 40
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
@@ -78,7 +80,7 @@ func handleAction(room *game.Room, p *game.Player, m Message) {
 		}
 		
 		// Match the client: only allow tiles 1 through 98
-		if m.X > 0 && m.X < 99 && m.Y > 0 && m.Y < 99 {
+		if m.X > 0 && m.X < WORLD_WIDTH-1 && m.Y > 0 && m.Y < WORLD_HEIGHT-1 {
 			p.X = m.X
 			p.Y = m.Y
 			room.BroadcastLocked()

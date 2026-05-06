@@ -18,9 +18,16 @@ export default class AssetManager {
       '/src/assets/tiles/Autotile_Grass_and_Dirt_Path_Tileset.png'
     )
 
-    this.scene.load.image(
+    this.scene.load.image('nature', '/src/assets/tiles/Nature_Tileset.png')
+    this.scene.load.image('exterior', '/src/assets/tiles/Exterior_Tileset.png')
+
+    this.scene.load.spritesheet(
       'crops',
-      '/src/assets/crops/Crops_Tileset.png'
+      '/src/assets/crops/Crops_Tileset.png', 
+      {
+        frameWidth: 16, 
+        frameHeight: 16
+      }
     )
 
     this.scene.load.spritesheet(
