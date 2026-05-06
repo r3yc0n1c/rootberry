@@ -22,6 +22,10 @@ class NetworkManager {
         this.worldState = data
       }
     }
+
+    this.socket.onerror = (error) => {
+      console.error('WebSocket error:', error)
+    }
   }
 
   send(data: any) {

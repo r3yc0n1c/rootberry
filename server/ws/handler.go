@@ -4,15 +4,14 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"rootberry/server/config"
 	"rootberry/server/game"
 
-	"github.com/gorilla/websocket"
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 )
 
 const DEBUG = true
-const WORLD_WIDTH = 50
-const WORLD_HEIGHT = 40
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
@@ -28,6 +27,8 @@ type Message struct {
 
 func HandleConnection(w http.ResponseWriter, r *http.Request) {
 	conn, _ := upgrader.Upgrade(w, r, nil)
+
+	config.LoadWorldConfig()
 
 	id := uuid.New().String()
 	room := manager.GetOrCreateRoom()
@@ -63,7 +64,7 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 		json.Unmarshal(msg, &m)
 
 		handleAction(room, player, m)
-		
+
 		log.Printf("[%s] state: %d, %d \n", m.Type, m.X, m.Y)
 	}
 }
@@ -78,9 +79,10 @@ func handleAction(room *game.Room, p *game.Player, m Message) {
 		if DEBUG {
 			log.Printf("[Move Request] Player %s to X:%d, Y:%d", p.ID, m.X, m.Y)
 		}
-		
+
 		// Match the client: only allow tiles 1 through 98
-		if m.X > 0 && m.X < WORLD_WIDTH-1 && m.Y > 0 && m.Y < WORLD_HEIGHT-1 {
+		if (m.X > 0 && m.X < config.FarmWorld.Size.Width-1) &&
+			(m.Y > 0 && m.Y < config.FarmWorld.Size.Height-1) {
 			p.X = m.X
 			p.Y = m.Y
 			room.BroadcastLocked()

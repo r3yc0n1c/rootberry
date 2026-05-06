@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import AssetManager from '../managers/AssetManager';
+import { Worlds } from '../worlds/Worlds';
 
 export default class BootScene extends Phaser.Scene {
   private assetManager!: AssetManager;
@@ -22,7 +23,12 @@ export default class BootScene extends Phaser.Scene {
     // Check if texture was loaded to prevent "duration of undefined" error
     if (this.textures.exists('bunny_idle')) {
       this.assetManager.createAnimations();
-      this.scene.start('FarmScene');
+
+      // Pass world config into FarmScene
+      this.scene.start('FarmScene', {
+        world: Worlds.FARM
+      });
+      
       this.scene.launch('UIScene');
     } else {
       console.error("Bunny textures missing! Check file paths in AssetManager.");

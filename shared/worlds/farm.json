@@ -1,0 +1,21 @@
+ {
+  "key": "farm",
+
+  "size": {
+    "width": 40,
+    "height": 22
+  },
+
+  "spawn": {
+    "x": 20,
+    "y": 11
+  },
+
+  "tiles": {
+    "grass": 58,
+    "tilled": 176,
+    "crop": 0
+  },
+
+  "playerVisibility": 25.0
+}

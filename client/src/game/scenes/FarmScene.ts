@@ -1,9 +1,9 @@
 import Phaser from 'phaser'
 import NetworkManager from '../managers/NetworkManager'
 import Player from '../entities/Player'
+import { FarmWorld } from "../worlds/FarmWorld";
 
-const MAP_SIZE_X = 40; // x tiles wide
-const MAP_SIZE_Y = 22; // y tiles high
+
 const TILE = 16;
 const SCALE = 2;
 const KEY_CONFIG = {
@@ -17,6 +17,7 @@ const KEY_CONFIG = {
 };
 
 export default class FarmScene extends Phaser.Scene {
+  private worldConfig!: typeof FarmWorld;
   players: Map<string, Player> = new Map();
   private isMoving = false;
   private controls!: Record<keyof typeof KEY_CONFIG, Phaser.Input.Keyboard.Key>;
@@ -25,15 +26,22 @@ export default class FarmScene extends Phaser.Scene {
   private cropLayer!: Phaser.Tilemaps.TilemapLayer;
 
   private lastSentPos = { x: -1, y: -1 };
+  private lastWorldHash = '';
 
   constructor() {
     super('FarmScene');
+  }
+
+  init(data: any) {
+    this.worldConfig = data.world;
   }
 
   create() {
     NetworkManager.connect();
     this.controls = this.input.keyboard!.addKeys(KEY_CONFIG) as any;
 
+    const MAP_SIZE_X = FarmWorld.size.width;
+    const MAP_SIZE_Y = FarmWorld.size.height;
     const worldPx = MAP_SIZE_X * TILE * SCALE;
     const worldPy = MAP_SIZE_Y * TILE * SCALE;
 
@@ -44,37 +52,33 @@ export default class FarmScene extends Phaser.Scene {
       tileHeight: TILE
     });
 
+    // --- ASSET LOADING ---
     const grassTileset = map.addTilesetImage('grass', 'grass');
     const natureTileset = map.addTilesetImage('nature', 'nature');
     const cropTileset = map.addTilesetImage('crops', 'crops');
     const exteriorTileset = map.addTilesetImage('exterior', 'exterior');
 
-    if (!grassTileset || !exteriorTileset) {
+    if (!grassTileset || !exteriorTileset || !natureTileset || !cropTileset) {
       console.error("Missing Tilesets! Check AssetManager.");
       return;
     }
 
-    // --- D. CREATE MULTIPLE LAYERS (Order determines Depth) ---
-
+    // --- B. LAYER SETUP ---
     // LAYER 1: BASE (Solid Grass & Dirt Paths) - Depth 0
-    const groundLayer = map.createBlankLayer('Ground', grassTileset)!;
-    groundLayer.setScale(SCALE).setDepth(0);
+    const groundLayer = map.createBlankLayer('Ground', grassTileset)!.setScale(SCALE).setDepth(0);
 
-    // LAYER 2: FARMING (Tilled Plots & Wet Soil) - Depth 1
-    // This starts empty. Player actions (Hoe) put tiles here.
-    this.farmingLayer = map.createBlankLayer('Farming', grassTileset)!;
-    this.farmingLayer.setScale(SCALE).setDepth(1);
+    // LAYER 2: FARMING (Tilled Plots & Wet Soil) - Depth 1, 2 (Separate layer for crops to appear above tilled soil)
+    this.farmingLayer = map.createBlankLayer('Farming', grassTileset)!.setScale(SCALE).setDepth(1);
+    this.cropLayer = map.createBlankLayer('Crops', cropTileset)!.setScale(SCALE).setDepth(2);
 
-    // LAYER 3: OBSTACLES (Fences, House Base, Bottom of Trees) - Depth 2
-    const obstacleLayer = map.createBlankLayer('Obstacles', exteriorTileset)!;
-    obstacleLayer.setScale(SCALE).setDepth(2);
+    // LAYER 3: OBSTACLES (Fences, House Base, Bottom of Trees) - Depth 3
+    const obstacleLayer = map.createBlankLayer('Obstacles', exteriorTileset)!.setScale(SCALE).setDepth(3);
 
+    // [cite: LAYER 4: ENTITIES] (Player sprite, Cow, Chicken) - Depth 4 (Set in entity class)
 
-    // [cite: LAYER 4: ENTITIES] (Player sprite, Cow, Chicken) - Depth 3 (Set in entity class)
+    // LAYER 5: OVERHEAD (Roofs, Top of Trees) - Depth 5
+    const overheadLayer = map.createBlankLayer('Overhead', natureTileset)!.setScale(SCALE).setDepth(5);
 
-    // LAYER 5: OVERHEAD (Roofs, Top of Trees) - Depth 4
-    const overheadLayer = map.createBlankLayer('Overhead', exteriorTileset)!;
-    overheadLayer.setScale(SCALE).setDepth(4);
 
     // =========================================
     // --- E. GENERATE WORLD ( procedural) ---
@@ -84,11 +88,14 @@ export default class FarmScene extends Phaser.Scene {
     // Fill the entire world with Grass (Index 58) 
     groundLayer.fill(58);
 
-    // Draw a Path and a Farm Plot (Indices from the pack)
-    // Draw a dirt path (Index 177 is a common horizontal path)
-    for (let x = 0; x < MAP_SIZE_X; x++) {
-      groundLayer.putTileAt(177, x, 4);
-    }
+    // Draw the "U-Shaped" Path
+    const pathTile = 177;
+    // Horizontal path from house to right
+    for (let x = 4; x < 18; x++) groundLayer.putTileAt(pathTile, x, 5);
+    // Vertical path down the right side
+    for (let y = 5; y < 22; y++) groundLayer.putTileAt(pathTile, 18, y);
+    // Horizontal path back left at the bottom
+    for (let x = 0; x < 18; x++) groundLayer.putTileAt(pathTile, x, 22);
 
     // Draw a 5x5 Tilled Dirt Plot in the center
     const dirtTile = 176;
@@ -146,7 +153,12 @@ export default class FarmScene extends Phaser.Scene {
     // --- G. FINALIZE SETUP ---
     this.cameras.main.setBounds(0, 0, worldPx, worldPy);
     this.cameras.main.setZoom(1);
-    this.cameras.main.centerOn(worldPx / 2, worldPy / 2);
+    // this.cameras.main.centerOn(worldPx / 2, worldPy / 2);
+
+    // Center camera on world spawn
+    const spawnPxX = this.worldConfig.spawn.x * TILE * SCALE;
+    const spawnPxY = this.worldConfig.spawn.y * TILE * SCALE;
+    this.cameras.main.centerOn(spawnPxX, spawnPxY);
 
     // Start network synchronization loop (same as before)
     this.time.addEvent({
@@ -161,6 +173,13 @@ export default class FarmScene extends Phaser.Scene {
     const myId = NetworkManager.playerId;
 
     if (!world || !world.players) return;
+
+    // prevent re-render spam
+    const hash = JSON.stringify(world.tiles);
+    if (hash !== this.lastWorldHash) {
+      this.renderWorldFromServer(world);
+      this.lastWorldHash = hash;
+    }
 
     // Create a set of IDs currently sent by the server
     const activeIds = new Set(Object.keys(world.players));
@@ -179,7 +198,19 @@ export default class FarmScene extends Phaser.Scene {
       const targetY = p.y * TILE * SCALE;
 
       if (!this.players.has(p.id)) {
-        const playerInstance = new Player(this, targetX, targetY, p.id);
+        let spawnX = p.x;
+        let spawnY = p.y;
+
+        // fallback if server sends nothing (future-proof)
+        if (!spawnX || !spawnY) {
+          spawnX = this.worldConfig.spawn.x;
+          spawnY = this.worldConfig.spawn.y;
+        }
+
+        const newPlayerTargetX = spawnX * TILE * SCALE;
+        const newPlayerTargetY = spawnY * TILE * SCALE;
+
+        const playerInstance = new Player(this, newPlayerTargetX, newPlayerTargetY, p.id);
         this.players.set(p.id, playerInstance);
 
         // POKEMON STYLE: Follow ONLY when near center of world
@@ -287,7 +318,7 @@ export default class FarmScene extends Phaser.Scene {
   }
 
   private canMoveTo(tx: number, ty: number): boolean {
-    return tx > 0 && tx < MAP_SIZE_X && ty > 0 && ty < MAP_SIZE_Y;
+    return tx > 0 && tx < FarmWorld.size.width && ty > 0 && ty < FarmWorld.size.height;
   }
 
   private handleMovement(nextX: number, nextY: number, direction: string, sprite: Player) {
@@ -332,7 +363,7 @@ export default class FarmScene extends Phaser.Scene {
       this.time.delayedCall(200, () => {
         this.farmingLayer.putTileAt(176, targetTile.x, targetTile.y);
         // Sync with server
-        NetworkManager.send({ type: 'farm_action', action: 'hoe', x: targetTile.x, y: targetTile.y });
+        NetworkManager.send({ type: 'till', x: targetTile.x, y: targetTile.y });
       });
     }
     else if (hasDirt && !hasCrop) {
@@ -340,7 +371,29 @@ export default class FarmScene extends Phaser.Scene {
       player.play(`bunny-wateringcan-${player.lastDir}`); // Using watering can as placeholder for "planting"
 
       this.cropLayer.putTileAt(0, targetTile.x, targetTile.y); // Index 0 of Crops_Tileset
-      NetworkManager.send({ type: 'farm_action', action: 'plant', x: targetTile.x, y: targetTile.y });
+      NetworkManager.send({ type: 'plant', x: targetTile.x, y: targetTile.y });
+    }
+  }
+
+  private renderWorldFromServer(world: any) {
+    for (let y = 0; y < world.height; y++) {
+      for (let x = 0; x < world.width; x++) {
+        const tile = world.tiles[y][x];
+
+        // --- Farming layer ---
+        if (tile.type === "tilled") {
+          this.farmingLayer.putTileAt(176, x, y);
+        } else {
+          this.farmingLayer.removeTileAt(x, y);
+        }
+
+        // --- Crop layer ---
+        if (tile.crop) {
+          this.cropLayer.putTileAt(0, x, y);
+        } else {
+          this.cropLayer.removeTileAt(x, y);
+        }
+      }
     }
   }
 }
