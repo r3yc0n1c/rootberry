@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
 import AssetManager from '../managers/AssetManager';
-import { Worlds } from '../worlds/Worlds';
 
 export default class BootScene extends Phaser.Scene {
   private assetManager!: AssetManager;
@@ -14,9 +13,9 @@ export default class BootScene extends Phaser.Scene {
     this.assetManager.loadAll();
 
     // Standard progress logging
-    this.load.on('progress', (value: number) => {
-      console.log(`Loading: ${Math.floor(value * 100)}%`);
-    });
+    // this.load.on('progress', (value: number) => {
+    //   console.log(`Loading: ${Math.floor(value * 100)}%`);
+    // });
   }
 
   create() {
@@ -24,11 +23,7 @@ export default class BootScene extends Phaser.Scene {
     if (this.textures.exists('bunny_idle')) {
       this.assetManager.createAnimations();
 
-      // Pass world config into FarmScene
-      this.scene.start('FarmScene', {
-        world: Worlds.FARM
-      });
-      
+      this.scene.start('WorldLoadScene');      
       this.scene.launch('UIScene');
     } else {
       console.error("Bunny textures missing! Check file paths in AssetManager.");

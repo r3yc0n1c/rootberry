@@ -2,6 +2,8 @@ import Phaser from 'phaser'
 import BootScene from './scenes/BootScene'
 import FarmScene from './scenes/FarmScene'
 import UIScene from './scenes/UIScene'
+import WorldLoadScene from './scenes/WorldLoadScene';
+
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -26,7 +28,7 @@ const config: Phaser.Types.Core.GameConfig = {
     },
   },
 
-  scene: [BootScene, FarmScene, UIScene],
+  scene: [BootScene, WorldLoadScene, FarmScene, UIScene],
 }
 
 export default config

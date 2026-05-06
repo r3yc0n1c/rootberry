@@ -25,10 +25,19 @@ type Room struct {
 	rng     *rand.Rand
 }
 
-const VISIBILITY_RADIUS = 25.0 // Tiles
+func (r *Room) StartHeartbeat() {
+    // 20 updates per second (50ms) is standard for games
+    ticker := time.NewTicker(50 * time.Millisecond)
+    
+    go func() {
+        for range ticker.C {
+            r.Broadcast()
+        }
+    }()
+}
 
 func NewRoom(id string) *Room {
-	return &Room{
+	room := &Room{
 		ID:      id,
 		World:   NewWorld(
 			config.FarmWorld.Size.Width, 
@@ -37,6 +46,10 @@ func NewRoom(id string) *Room {
 		Clients: make(map[string]*Client),
 		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
+
+	room.StartHeartbeat()
+	
+	return room
 }
 
 func (r *Room) AddClient(id string, conn *websocket.Conn) *Player {

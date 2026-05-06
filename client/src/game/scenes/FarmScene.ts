@@ -1,11 +1,11 @@
 import Phaser from 'phaser'
 import NetworkManager from '../managers/NetworkManager'
 import Player from '../entities/Player'
-import { FarmWorld } from "../worlds/FarmWorld";
 
 
 const TILE = 16;
 const SCALE = 2;
+
 const KEY_CONFIG = {
   UP: Phaser.Input.Keyboard.KeyCodes.W,
   DOWN: Phaser.Input.Keyboard.KeyCodes.S,
@@ -17,7 +17,7 @@ const KEY_CONFIG = {
 };
 
 export default class FarmScene extends Phaser.Scene {
-  private worldConfig!: typeof FarmWorld;
+  private worldConfig: any;
   players: Map<string, Player> = new Map();
   private isMoving = false;
   private controls!: Record<keyof typeof KEY_CONFIG, Phaser.Input.Keyboard.Key>;
@@ -37,11 +37,15 @@ export default class FarmScene extends Phaser.Scene {
   }
 
   create() {
-    NetworkManager.connect();
+    if (!this.worldConfig) {
+      console.error("Missing worldConfig!");
+      return;
+    }
+
     this.controls = this.input.keyboard!.addKeys(KEY_CONFIG) as any;
 
-    const MAP_SIZE_X = FarmWorld.size.width;
-    const MAP_SIZE_Y = FarmWorld.size.height;
+    const MAP_SIZE_X = this.worldConfig.width;
+    const MAP_SIZE_Y = this.worldConfig.height;
     const worldPx = MAP_SIZE_X * TILE * SCALE;
     const worldPy = MAP_SIZE_Y * TILE * SCALE;
 
@@ -186,7 +190,7 @@ export default class FarmScene extends Phaser.Scene {
 
     // Remove players who are no longer "nearby"
     this.players.forEach((sprite, id) => {
-      if (!activeIds.has(id)) {
+      if (!activeIds.has(id) && id !== myId) {
         sprite.destroy(); // Remove the Bunny from the screen
         this.players.delete(id);
       }
@@ -219,6 +223,8 @@ export default class FarmScene extends Phaser.Scene {
           this.cameras.main.startFollow(playerInstance, true, 0.2, 0.2);
           // Small deadzone so bunny moves a bit before camera follows
           this.cameras.main.setDeadzone(50, 50);
+
+          this.lastSentPos = { x: p.x, y: p.y };
         }
       }
 
@@ -291,7 +297,7 @@ export default class FarmScene extends Phaser.Scene {
 
     // --- Movement Logic ---
 
-    let { x, y } = me;
+    let { x, y } = this.lastSentPos; // Start from last sent position, not sprite position
     let moved = false;
     let direction = mySprite.lastDir; // Default to last direction if no input
 
@@ -305,7 +311,7 @@ export default class FarmScene extends Phaser.Scene {
       y++; moved = true; direction = 'down';
     }
 
-    if (moved && (x !== this.lastSentPos.x || y !== this.lastSentPos.y)) {
+    if (moved) {
       // IMMEDIATELY tell the sprite it is moving
       if (this.canMoveTo(x, y)) {
         this.lastSentPos = { x, y };
@@ -318,7 +324,7 @@ export default class FarmScene extends Phaser.Scene {
   }
 
   private canMoveTo(tx: number, ty: number): boolean {
-    return tx > 0 && tx < FarmWorld.size.width && ty > 0 && ty < FarmWorld.size.height;
+    return tx > 0 && tx < this.worldConfig.width && ty > 0 && ty < this.worldConfig.height;
   }
 
   private handleMovement(nextX: number, nextY: number, direction: string, sprite: Player) {

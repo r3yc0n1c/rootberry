@@ -35,11 +35,18 @@ func HandleConnection(w http.ResponseWriter, r *http.Request) {
 
 	player := room.AddClient(id, conn)
 
-	// Send the player their own ID
-	initMsg := map[string]string{
+	// Send init config with the player ID
+	initMsg := map[string]interface{}{
 		"type": "init",
 		"id":   id,
+		"world": map[string]interface{}{
+			"key":    config.FarmWorld.Key,
+			"width":  config.FarmWorld.Size.Width,
+			"height": config.FarmWorld.Size.Height,
+			"spawn":  config.FarmWorld.Spawn,
+		},
 	}
+
 	initData, _ := json.Marshal(initMsg)
 	conn.WriteMessage(websocket.TextMessage, initData)
 
@@ -80,12 +87,11 @@ func handleAction(room *game.Room, p *game.Player, m Message) {
 			log.Printf("[Move Request] Player %s to X:%d, Y:%d", p.ID, m.X, m.Y)
 		}
 
-		// Match the client: only allow tiles 1 through 98
-		if (m.X > 0 && m.X < config.FarmWorld.Size.Width-1) &&
-			(m.Y > 0 && m.Y < config.FarmWorld.Size.Height-1) {
+		// Match the client movement logic
+		if (m.X > 0 && m.X < config.FarmWorld.Size.Width) &&
+			(m.Y > 0 && m.Y < config.FarmWorld.Size.Height) {
 			p.X = m.X
 			p.Y = m.Y
-			room.BroadcastLocked()
 		}
 
 	case "till":
