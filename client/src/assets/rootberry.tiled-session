@@ -1,9 +1,9 @@
 {
-    "activeFile": "tiles/Exterior_Tileset.tsx",
+    "activeFile": "",
     "expandedProjectPaths": [
+        "bunny",
         "tiles",
-        ".",
-        "bunny"
+        "."
     ],
     "file.lastUsedOpenFilter": "All Files (*)",
     "fileStates": {
@@ -29,7 +29,7 @@
         },
         "tiles/Nature_Tileset.tsx": {
             "scaleInDock": 1,
-            "scaleInEditor": 1
+            "scaleInEditor": 1.5
         },
         "tiles/grass.tsx": {
             "scaleInDock": 1,
@@ -38,13 +38,12 @@
     },
     "last.imagePath": "D:/rootberry/client/src/assets/tiles",
     "openFiles": [
-        "tiles/Exterior_Tileset.tsx"
     ],
     "project": "rootberry.tiled-project",
     "recentFiles": [
+        "tiles/Exterior_Tileset.tsx",
         "tiles/Nature_Tileset.tsx",
         "tiles/grass.tsx",
-        "tiles/Exterior_Tileset.tsx",
         "bunny/IDLE/Nature_Tileset.tsx",
         "bunny/IDLE/Bunny_Idle.tsx",
         "bunny/RUN/Bunny_Run.tsx",

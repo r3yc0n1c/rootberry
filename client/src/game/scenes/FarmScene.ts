@@ -60,9 +60,9 @@ export default class FarmScene extends Phaser.Scene {
     const grassTileset = map.addTilesetImage('grass', 'grass');
     const natureTileset = map.addTilesetImage('nature', 'nature');
     const cropTileset = map.addTilesetImage('crops', 'crops');
-    const exteriorTileset = map.addTilesetImage('exterior', 'exterior');
+    const exteriorTileset = map.addTilesetImage('exterior', 'exterior', 16, 16, 0, 0, natureTileset!.total);
     // House tileset uses "exterior" image but different GIDs, so we add it as a separate tileset to get its own firstgid
-    const houseTileset = map.addTilesetImage('house', 'house', 16, 16, 0, 0, exteriorTileset?.total);
+    const houseTileset = map.addTilesetImage('house', 'house', 16, 16, 0, 0, natureTileset!.total + exteriorTileset!.total);
 
     if (!grassTileset || !exteriorTileset || !natureTileset || !cropTileset || !houseTileset) {
       console.error("Missing Tilesets! Check AssetManager.");
@@ -77,6 +77,13 @@ export default class FarmScene extends Phaser.Scene {
     this.farmingLayer = map.createBlankLayer('Farming', grassTileset)!.setScale(SCALE).setDepth(1);
     this.cropLayer = map.createBlankLayer('Crops', cropTileset)!.setScale(SCALE).setDepth(2);
 
+    const backgroundLayer = map.createBlankLayer(
+      'BackgroundDecor',
+      [natureTileset, exteriorTileset]
+    )!
+      .setScale(SCALE)
+      .setDepth(2.5);
+
     // LAYER 3: OBSTACLES (Fences, House Base, Bottom of Trees) - Depth 3
     // const obstacleLayer = map.createBlankLayer('Obstacles', exteriorTileset)!.setScale(SCALE).setDepth(3);
     const obstacleLayer = map.createBlankLayer(
@@ -86,10 +93,25 @@ export default class FarmScene extends Phaser.Scene {
       .setScale(SCALE)
       .setDepth(3);
 
+    const treeLayer = map.createBlankLayer(
+      'Trees',
+      [natureTileset]
+    )!
+      .setScale(SCALE)
+      .setDepth(3.1);
+
+    const houseLayer = map.createBlankLayer(
+      'House',
+      [houseTileset]
+    )!
+      .setScale(SCALE)
+      .setDepth(3.2);
+
     const detailLayer = map.createBlankLayer('Details', houseTileset)!
       .setScale(SCALE)
-      .setDepth(3.5); // For things like windows that should be above obstacles but below players
+      .setDepth(3.3); // For things like windows that should be above obstacles but below players
 
+    console.log('natureTileset.firstgid:', natureTileset.firstgid);
     console.log('exteriorTileset.firstgid:', exteriorTileset.firstgid);
     console.log('houseTileset.firstgid:', houseTileset.firstgid);
 
@@ -99,6 +121,7 @@ export default class FarmScene extends Phaser.Scene {
     const overheadLayer = map.createBlankLayer('Overhead', natureTileset)!.setScale(SCALE).setDepth(5);
 
     // Helpers
+    const NAT = (i: number) => natureTileset.firstgid + i;
     const EXT = (i: number) => exteriorTileset.firstgid + i;
     const HOUSE = (i: number) => houseTileset.firstgid + i;
 
@@ -107,17 +130,17 @@ export default class FarmScene extends Phaser.Scene {
     // =========================================
 
     // Fill the entire world with Ground (Index 58)
-    groundLayer.fill(58);
+    groundLayer.fill(73);
 
     // draw fence
     const fenceTile = {
-      verticalLeft: 55,
-      verticalRight: 57,
-      horizontal: 81,
-      topLeftCorner: 30,
-      topRightCorner: 32,
-      bottomLeftCorner: 80,
-      bottomRightCorner: 82
+      verticalLeft: EXT(55),
+      verticalRight: EXT(57),
+      horizontal: EXT(81),
+      topLeftCorner: EXT(30),
+      topRightCorner: EXT(32),
+      bottomLeftCorner: EXT(80),
+      bottomRightCorner: EXT(82)
     };
 
     obstacleLayer.putTileAt(fenceTile.topLeftCorner, 0, 0);
@@ -138,16 +161,8 @@ export default class FarmScene extends Phaser.Scene {
 
     // THE HOUSE (Top Center-Left)
     const houseX = 3;
-    const houseY = 3;
+    const houseY = 1;
 
-    // // House Base (Obstacle)
-    // obstacleLayer.putTilesAt([
-    //     [432, 433, 434, 435],
-    //     [464, 465, 466, 467],
-    //     [496, 497, 498, 499]
-    // ], houseX, houseY);
-
-    // // House Roof (Overhead)
     const roofTiles = [
       [51, 51, 42, 51, 51],
       [44, 53, 118, 54, 45],
@@ -156,24 +171,74 @@ export default class FarmScene extends Phaser.Scene {
       [115, 209, 111, 209, 116]
     ].map(row => row.map(HOUSE));
 
-    obstacleLayer.putTilesAt(roofTiles, houseX, houseY - 2);
+    houseLayer.putTilesAt(roofTiles, houseX, houseY - 2);
     detailLayer.putTileAt(HOUSE(68), houseX + 2, houseY + 1);    // top window
     detailLayer.putTileAt(HOUSE(377), houseX + 2, houseY + 2);   // main door shed
     detailLayer.putTileAt(HOUSE(182), houseX + 1, houseY + 2);   // left window
     detailLayer.putTileAt(HOUSE(182), houseX + 3, houseY + 2);   // right window
 
+    // trees
+    const treeTiles = {
+      left: [
+        [90, 91, 92, 93],
+        [111, 112, 113, 114],
+        [132, 133, 134, 135],
+      ].map(row => row.map(NAT)),
 
-    // Draw the "U-Shaped" Path
-    const pathTile = 177;
+      right: [
+        [45, 46],
+        [66, 67],
+      ].map(row => row.map(NAT)),
+    }
+    
+    const wellTiles = [
+      [135, 136],
+      [160, 161],
+    ].map(row => row.map(EXT))
+
+    treeLayer.putTilesAt(treeTiles.left, 0, 0);
+    treeLayer.putTilesAt(treeTiles.right, 7, 0);
+    backgroundLayer.putTilesAt(wellTiles, 8, 2);
+
+    backgroundLayer.putTileAt(NAT(153), 1, 3);
+    backgroundLayer.putTileAt(NAT(39), 1, 4);
+    backgroundLayer.putTileAt(EXT(70), 2, 3);
+
+
+    // Draw the "z-Shaped" Path
+    groundLayer.putTileAt(57, 5, 4);
+    groundLayer.putTileAt(78, 5, 5);
+    groundLayer.putTileAt(60, 6, 4);
     // Horizontal path from house to right
-    for (let x = 4; x < 18; x++) groundLayer.putTileAt(pathTile, x, 5);
+    let x;
+    for (x = 7; x < 18; x++) {
+      groundLayer.putTileAt(37, x, 4);
+      groundLayer.putTileAt(79, x-1, 5);
+    }
+
+    groundLayer.putTileAt(38, x, 4);
+    groundLayer.putTileAt(59, x, 5);
+    groundLayer.putTileAt(40, --x, 5);
+
     // Vertical path down the right side
-    for (let y = 5; y < 22; y++) groundLayer.putTileAt(pathTile, 18, y);
+    let y;
+    for (y = 6; y < 20; y++) {
+      groundLayer.putTileAt(57, x, y);
+      groundLayer.putTileAt(59, x+1, y);
+    }
+    
+    groundLayer.putTileAt(57, x, y++);
+    groundLayer.putTileAt(78, x++, y);
+    groundLayer.putTileAt(60, x, y-1);
+
     // Horizontal path back left at the bottom
-    for (let x = 0; x < 18; x++) groundLayer.putTileAt(pathTile, x, 22);
+    for (; x < 40; x++) {
+      groundLayer.putTileAt(37, x+1, y-1);
+      groundLayer.putTileAt(79, x, y);
+    }
 
     // Draw a 5x5 Tilled Dirt Plot in the center
-    const dirtTile = 176;
+    const dirtTile = 58;
     for (let y = 8; y < 13; y++) {
       for (let x = 10; x < 15; x++) {
         this.farmingLayer.putTileAt(dirtTile, x, y);
