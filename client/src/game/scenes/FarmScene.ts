@@ -64,7 +64,9 @@ export default class FarmScene extends Phaser.Scene {
     // House tileset uses "exterior" image but different GIDs, so we add it as a separate tileset to get its own firstgid
     const houseTileset = map.addTilesetImage('house', 'house', 16, 16, 0, 0, natureTileset!.total + exteriorTileset!.total);
 
-    if (!grassTileset || !exteriorTileset || !natureTileset || !cropTileset || !houseTileset) {
+    const floorDetailsTileset = map.addTilesetImage('floor_details', 'floor_details', 16, 16, 0, 0, natureTileset!.total + exteriorTileset!.total);
+
+    if (!grassTileset || !exteriorTileset || !natureTileset || !cropTileset || !houseTileset || !floorDetailsTileset) {
       console.error("Missing Tilesets! Check AssetManager.");
       return;
     }
@@ -85,7 +87,6 @@ export default class FarmScene extends Phaser.Scene {
       .setDepth(2.5);
 
     // LAYER 3: OBSTACLES (Fences, House Base, Bottom of Trees) - Depth 3
-    // const obstacleLayer = map.createBlankLayer('Obstacles', exteriorTileset)!.setScale(SCALE).setDepth(3);
     const obstacleLayer = map.createBlankLayer(
       'Obstacles',
       [exteriorTileset, houseTileset] // multiple tilesets
@@ -107,7 +108,7 @@ export default class FarmScene extends Phaser.Scene {
       .setScale(SCALE)
       .setDepth(3.2);
 
-    const detailLayer = map.createBlankLayer('Details', houseTileset)!
+    const detailLayer = map.createBlankLayer('Details', [houseTileset, floorDetailsTileset])!
       .setScale(SCALE)
       .setDepth(3.3); // For things like windows that should be above obstacles but below players
 
@@ -124,6 +125,28 @@ export default class FarmScene extends Phaser.Scene {
     const NAT = (i: number) => natureTileset.firstgid + i;
     const EXT = (i: number) => exteriorTileset.firstgid + i;
     const HOUSE = (i: number) => houseTileset.firstgid + i;
+    const FLOOR = (i: number) => floorDetailsTileset.firstgid + i;
+
+    const details = {
+      flower1: FLOOR(13),
+      flower2: FLOOR(24),
+      grassGroupL: [
+        [FLOOR(17), FLOOR(18)],
+        [FLOOR(28), FLOOR(29)]
+      ],
+      grassGroupS: [
+        [FLOOR(19), FLOOR(20)],
+        [FLOOR(30), FLOOR(31)]
+      ],
+      lampPost: [
+        [EXT(39), EXT(40)], 
+        [EXT(64), EXT(65)]
+      ],
+      noticeBoard: [
+        [EXT(47), EXT(48)],
+        [EXT(72), EXT(73)]
+       ]
+    }
 
     // =========================================
     // --- E. GENERATE WORLD ( procedural) ---
@@ -140,7 +163,9 @@ export default class FarmScene extends Phaser.Scene {
       topLeftCorner: EXT(30),
       topRightCorner: EXT(32),
       bottomLeftCorner: EXT(80),
-      bottomRightCorner: EXT(82)
+      bottomRightCorner: EXT(82),
+      horizontalBrokenUp: EXT(33),
+      horizontalBrokendown: EXT(83)
     };
 
     obstacleLayer.putTileAt(fenceTile.topLeftCorner, 0, 0);
@@ -179,91 +204,248 @@ export default class FarmScene extends Phaser.Scene {
 
     // trees
     const treeTiles = {
-      left: [
+      pineGroup: [
         [90, 91, 92, 93],
         [111, 112, 113, 114],
         [132, 133, 134, 135],
       ].map(row => row.map(NAT)),
 
-      right: [
+      pineSingle: [
         [45, 46],
         [66, 67],
       ].map(row => row.map(NAT)),
+
+      bigTree: [
+        [22, 23],
+        [43, 44],
+        [64, 65]
+      ].map(row => row.map(NAT))
     }
-    
+
     const wellTiles = [
       [135, 136],
       [160, 161],
     ].map(row => row.map(EXT))
 
-    treeLayer.putTilesAt(treeTiles.left, 0, 0);
-    treeLayer.putTilesAt(treeTiles.right, 7, 0);
+    treeLayer.putTilesAt(treeTiles.pineGroup, 0, 0);
+    treeLayer.putTilesAt(treeTiles.pineSingle, 7, 0);
     backgroundLayer.putTilesAt(wellTiles, 8, 2);
 
     backgroundLayer.putTileAt(NAT(153), 1, 3);
     backgroundLayer.putTileAt(NAT(39), 1, 4);
     backgroundLayer.putTileAt(EXT(70), 2, 3);
 
+    treeLayer.putTilesAt(treeTiles.bigTree, 1, 4);
+
 
     // Draw the "z-Shaped" Path
+    const groundTiles = {
+      topLeftCorner: 36,
+      topRightCorner: 38,
+      top: 37,
+      left: 57,
+      right: 59,
+      bottomLeftCorner: 78,
+      bottomRightCorner: 80,
+      bottom: 79,
+      bottomRightEdge: 39,
+      bottomLeftEdge: 40,
+      topRightEdge: 60,
+      topLeftEdge: 61,
+    };
+
+
     groundLayer.putTileAt(57, 5, 4);
     groundLayer.putTileAt(78, 5, 5);
     groundLayer.putTileAt(60, 6, 4);
     // Horizontal path from house to right
     let x;
     for (x = 7; x < 18; x++) {
-      groundLayer.putTileAt(37, x, 4);
-      groundLayer.putTileAt(79, x-1, 5);
+      groundLayer.putTileAt(groundTiles.top, x, 4);
+      groundLayer.putTileAt(groundTiles.bottom, x - 1, 5);
     }
 
-    groundLayer.putTileAt(38, x, 4);
-    groundLayer.putTileAt(59, x, 5);
-    groundLayer.putTileAt(40, --x, 5);
+    groundLayer.putTileAt(groundTiles.topRightCorner, x, 4);
+    groundLayer.putTileAt(groundTiles.right, x, 5);
+    groundLayer.putTileAt(groundTiles.bottomLeftEdge, --x, 5);
 
     // Vertical path down the right side
     let y;
     for (y = 6; y < 20; y++) {
-      groundLayer.putTileAt(57, x, y);
-      groundLayer.putTileAt(59, x+1, y);
+      groundLayer.putTileAt(groundTiles.left, x, y);
+      groundLayer.putTileAt(groundTiles.right, x + 1, y);
     }
-    
-    groundLayer.putTileAt(57, x, y++);
-    groundLayer.putTileAt(78, x++, y);
-    groundLayer.putTileAt(60, x, y-1);
+
+    groundLayer.putTileAt(groundTiles.left, x, y++);
+    groundLayer.putTileAt(groundTiles.bottomLeftCorner, x++, y);
+    groundLayer.putTileAt(groundTiles.topRightEdge, x, y - 1);
 
     // Horizontal path back left at the bottom
     for (; x < 40; x++) {
-      groundLayer.putTileAt(37, x+1, y-1);
-      groundLayer.putTileAt(79, x, y);
+      groundLayer.putTileAt(groundTiles.top, x + 1, y - 1);
+      groundLayer.putTileAt(groundTiles.bottom, x, y);
     }
 
-    // Draw a 5x5 Tilled Dirt Plot in the center
+    // =========================================
+    // Farming Area (Center)
+    // =========================================
     const dirtTile = 58;
-    for (let y = 8; y < 13; y++) {
-      for (let x = 10; x < 15; x++) {
-        this.farmingLayer.putTileAt(dirtTile, x, y);
+    const farmPlot = {
+      x: 2,
+      y: 9,
+      width: 10,
+      height: 8
+    };
+
+    const startX = farmPlot.x;
+    const startY = farmPlot.y;
+
+    const endX = startX + farmPlot.width - 1;
+    const endY = startY + farmPlot.height - 1;
+
+    // =========================================
+    // Fill Dirt
+    // =========================================
+
+    for (let y = startY; y <= endY; y++) {
+      for (let x = startX; x <= endX; x++) {
+        groundLayer.putTileAt(dirtTile, x, y);
       }
     }
 
     // =========================================
-    // --- F. PLACE SPECIFIC STRUCTURES ---
+    // Ground Border Top + Bottom
     // =========================================
 
-    // Choose a starting position for the "farm area"
-    const farmStartX = 10;
-    const farmStartY = 10;
+    for (let x = startX; x <= endX; x++) {
+      groundLayer.putTileAt(
+        groundTiles.top,
+        x,
+        startY - 1
+      );
 
-    // --- 1. Place the "Starter Tilled Field" (RECTANGLE) ---
-    // This fixes your "Strip" field.
-    const fieldWidth = 8;
-    const fieldHeight = 5;
-    const dirtTileIndex = 176; // Index of tilled soil in grass sheet
-
-    for (let h = 0; h < fieldHeight; h++) {
-      for (let w = 0; w < fieldWidth; w++) {
-        this.farmingLayer.putTileAt(dirtTileIndex, farmStartX + w, farmStartY + h);
-      }
+      groundLayer.putTileAt(
+        groundTiles.bottom,
+        x,
+        endY + 1
+      );
     }
+
+    // =========================================
+    // Ground Border Left + Right
+    // =========================================
+
+    for (let y = startY; y <= endY; y++) {
+      groundLayer.putTileAt(
+        groundTiles.left,
+        startX - 1,
+        y
+      );
+
+      groundLayer.putTileAt(
+        groundTiles.right,
+        endX + 1,
+        y
+      );
+    }
+
+    // =========================================
+    // Corners
+    // =========================================
+
+    groundLayer.putTileAt(
+      groundTiles.topLeftCorner,
+      startX - 1,
+      startY - 1
+    );
+
+    groundLayer.putTileAt(
+      groundTiles.topRightCorner,
+      endX + 1,
+      startY - 1
+    );
+
+    groundLayer.putTileAt(
+      groundTiles.bottomLeftCorner,
+      startX - 1,
+      endY + 1
+    );
+
+    groundLayer.putTileAt(
+      groundTiles.bottomRightCorner,
+      endX + 1,
+      endY + 1
+    );
+
+    // Top Fence
+
+    for (let x = startX - 1; x <= endX + 1; x++) {
+      obstacleLayer.putTileAt(
+        fenceTile.horizontalBrokenUp,
+        x,
+        startY - 2
+      );
+    }
+
+    // Bottom Fence
+
+    for (let x = startX - 1; x <= endX + 1; x++) {
+      obstacleLayer.putTileAt(
+        fenceTile.horizontalBrokenUp,
+        x,
+        endY + 2
+      );
+    }
+
+
+    // Pond
+    const pondTiles = [
+      [175, 199, 199, 199, 199, 199, 199, 199, 199, 199, 199, 199, 199, 174],
+      [180, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 156],
+      [180, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 156],
+    ].map(row => row.map(NAT));
+
+    const pondEco = {
+      lotus: NAT(162),
+      lilyPad: NAT(161),
+      waterStoneXS: NAT(122),
+      waterStoneL: NAT(124),
+      bubbles: NAT(163),
+      waterStoneWithMossXL: [
+        [NAT(119), NAT(120)],
+        [NAT(140), NAT(141)]
+      ],
+      waterBamboo: NAT(74),
+    }
+
+    const bridgeTiles = [
+      [183, 184, 184, 185],
+      [208, 209, 209, 210],
+      [233, 234, 234, 235]
+    ].map(row => row.map(EXT));
+
+    groundLayer.putTilesAt(pondTiles, 1, MAP_SIZE_Y - 3);
+    backgroundLayer.putTilesAt(bridgeTiles, pondTiles[0].length - 3, MAP_SIZE_Y - 2);
+    backgroundLayer.putTileAt(pondEco.bubbles, 4, MAP_SIZE_Y - 2);
+    backgroundLayer.putTileAt(pondEco.lilyPad, 2, MAP_SIZE_Y - 1);
+    backgroundLayer.putTileAt(pondEco.lotus, 3, MAP_SIZE_Y - 1);
+    backgroundLayer.putTilesAt(
+      pondEco.waterStoneWithMossXL,
+      2,
+      MAP_SIZE_Y - 3
+    );
+    backgroundLayer.putTileAt(pondEco.lotus, 8, MAP_SIZE_Y - 2);
+    backgroundLayer.putTileAt(pondEco.waterBamboo, 10, MAP_SIZE_Y - 2);
+
+    treeLayer.putTilesAt(treeTiles.pineSingle, 13, MAP_SIZE_Y - 5);
+    detailLayer.putTileAt(details.flower2, 14, MAP_SIZE_Y - 3);
+
+    detailLayer.putTilesAt(details.grassGroupS, 15, MAP_SIZE_Y - 2);
+
+    obstacleLayer.putTilesAt(details.lampPost, 15, MAP_SIZE_Y - 4);
+
+    obstacleLayer.putTilesAt(details.noticeBoard, 19, MAP_SIZE_Y - 4);
+
 
     // --- G. FINALIZE SETUP ---
     this.cameras.main.setBounds(0, 0, worldPx, worldPy);
