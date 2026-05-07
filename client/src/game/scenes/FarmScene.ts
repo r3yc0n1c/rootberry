@@ -61,8 +61,10 @@ export default class FarmScene extends Phaser.Scene {
     const natureTileset = map.addTilesetImage('nature', 'nature');
     const cropTileset = map.addTilesetImage('crops', 'crops');
     const exteriorTileset = map.addTilesetImage('exterior', 'exterior');
+    // House tileset uses "exterior" image but different GIDs, so we add it as a separate tileset to get its own firstgid
+    const houseTileset = map.addTilesetImage('house', 'house', 16, 16, 0, 0, exteriorTileset?.total);
 
-    if (!grassTileset || !exteriorTileset || !natureTileset || !cropTileset) {
+    if (!grassTileset || !exteriorTileset || !natureTileset || !cropTileset || !houseTileset) {
       console.error("Missing Tilesets! Check AssetManager.");
       return;
     }
@@ -76,21 +78,90 @@ export default class FarmScene extends Phaser.Scene {
     this.cropLayer = map.createBlankLayer('Crops', cropTileset)!.setScale(SCALE).setDepth(2);
 
     // LAYER 3: OBSTACLES (Fences, House Base, Bottom of Trees) - Depth 3
-    const obstacleLayer = map.createBlankLayer('Obstacles', exteriorTileset)!.setScale(SCALE).setDepth(3);
+    // const obstacleLayer = map.createBlankLayer('Obstacles', exteriorTileset)!.setScale(SCALE).setDepth(3);
+    const obstacleLayer = map.createBlankLayer(
+      'Obstacles',
+      [exteriorTileset, houseTileset] // multiple tilesets
+    )!
+      .setScale(SCALE)
+      .setDepth(3);
+
+    const detailLayer = map.createBlankLayer('Details', houseTileset)!
+      .setScale(SCALE)
+      .setDepth(3.5); // For things like windows that should be above obstacles but below players
+
+    console.log('exteriorTileset.firstgid:', exteriorTileset.firstgid);
+    console.log('houseTileset.firstgid:', houseTileset.firstgid);
 
     // [cite: LAYER 4: ENTITIES] (Player sprite, Cow, Chicken) - Depth 4 (Set in entity class)
 
     // LAYER 5: OVERHEAD (Roofs, Top of Trees) - Depth 5
     const overheadLayer = map.createBlankLayer('Overhead', natureTileset)!.setScale(SCALE).setDepth(5);
 
+    // Helpers
+    const EXT = (i: number) => exteriorTileset.firstgid + i;
+    const HOUSE = (i: number) => houseTileset.firstgid + i;
 
     // =========================================
     // --- E. GENERATE WORLD ( procedural) ---
     // =========================================
-    // This replaces the simple loop and map.fill(0).
 
-    // Fill the entire world with Grass (Index 58) 
+    // Fill the entire world with Ground (Index 58)
     groundLayer.fill(58);
+
+    // draw fence
+    const fenceTile = {
+      verticalLeft: 55,
+      verticalRight: 57,
+      horizontal: 81,
+      topLeftCorner: 30,
+      topRightCorner: 32,
+      bottomLeftCorner: 80,
+      bottomRightCorner: 82
+    };
+
+    obstacleLayer.putTileAt(fenceTile.topLeftCorner, 0, 0);
+    // obstacleLayer.putTileAt(fenceTile.topRightCorner, MAP_SIZE_X - 1, 0);
+
+    for (let x = 1; x < MAP_SIZE_X; x++) {
+      obstacleLayer.putTileAt(fenceTile.horizontal, x, 0);
+      // obstacleLayer.putTileAt(fenceTile.horizontal, x, MAP_SIZE_Y - 1);
+    }
+
+    // obstacleLayer.putTileAt(fenceTile.bottomLeftCorner, 0, MAP_SIZE_Y - 1);
+    // obstacleLayer.putTileAt(fenceTile.bottomRightCorner, MAP_SIZE_X - 1, MAP_SIZE_Y - 1);
+
+    for (let y = 1; y < MAP_SIZE_Y; y++) {
+      obstacleLayer.putTileAt(fenceTile.verticalLeft, 0, y);
+      // obstacleLayer.putTileAt(fenceTile.verticalRight, MAP_SIZE_X - 1, y);
+    }
+
+    // THE HOUSE (Top Center-Left)
+    const houseX = 3;
+    const houseY = 3;
+
+    // // House Base (Obstacle)
+    // obstacleLayer.putTilesAt([
+    //     [432, 433, 434, 435],
+    //     [464, 465, 466, 467],
+    //     [496, 497, 498, 499]
+    // ], houseX, houseY);
+
+    // // House Roof (Overhead)
+    const roofTiles = [
+      [51, 51, 42, 51, 51],
+      [44, 53, 118, 54, 45],
+      [82, 91, 81, 92, 83],
+      [120, 129, 119, 130, 121],
+      [115, 209, 111, 209, 116]
+    ].map(row => row.map(HOUSE));
+
+    obstacleLayer.putTilesAt(roofTiles, houseX, houseY - 2);
+    detailLayer.putTileAt(HOUSE(68), houseX + 2, houseY + 1);    // top window
+    detailLayer.putTileAt(HOUSE(377), houseX + 2, houseY + 2);   // main door shed
+    detailLayer.putTileAt(HOUSE(182), houseX + 1, houseY + 2);   // left window
+    detailLayer.putTileAt(HOUSE(182), houseX + 3, houseY + 2);   // right window
+
 
     // Draw the "U-Shaped" Path
     const pathTile = 177;
@@ -128,31 +199,6 @@ export default class FarmScene extends Phaser.Scene {
         this.farmingLayer.putTileAt(dirtTileIndex, farmStartX + w, farmStartY + h);
       }
     }
-
-    // --- 2. Create the "Fence Perimeter" ( procedural) ---
-    // Use indices from Exterior_Tileset. These might need adjustment.
-    const fenceTopIndex = 100; // Example indices
-    const fenceSideIndex = 101;
-    const perimeterWidth = 20;
-    const perimeterHeight = 15;
-
-    for (let x = farmStartX - 2; x < farmStartX + perimeterWidth; x++) {
-      obstacleLayer.putTileAt(fenceTopIndex, x, farmStartY - 3); // Top Fence
-      obstacleLayer.putTileAt(fenceTopIndex, x, farmStartY + perimeterHeight + 2); // Bottom
-    }
-    for (let y = farmStartY - 3; y < farmStartY + perimeterHeight + 2; y++) {
-      obstacleLayer.putTileAt(fenceSideIndex, farmStartX - 2, y); // Left Fence
-      obstacleLayer.putTileAt(fenceSideIndex, farmStartX + perimeterWidth, y); // Right Fence
-    }
-
-    // --- 3. Place the "House" (Procedural or Tiled JSON) ---
-    // In code, you manually place tiles:
-    // Bottom layer (collidable wall)
-    obstacleLayer.putTileAt(200, 25, 8); // House indices from exteriorTileset
-    obstacleLayer.putTileAt(201, 26, 8);
-    // Overhead layer (roof, not collidable)
-    overheadLayer.putTileAt(210, 25, 7);
-    overheadLayer.putTileAt(211, 26, 7);
 
     // --- G. FINALIZE SETUP ---
     this.cameras.main.setBounds(0, 0, worldPx, worldPy);

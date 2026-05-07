@@ -20,6 +20,7 @@ export default class AssetManager {
 
     this.scene.load.image('nature', '/src/assets/tiles/Nature_Tileset.png')
     this.scene.load.image('exterior', '/src/assets/tiles/Exterior_Tileset.png')
+    this.scene.load.image('house', '/src/assets/tiles/House_Tileset.png')
 
     this.scene.load.spritesheet(
       'crops',
