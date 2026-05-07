@@ -30,6 +30,7 @@ export default class WorldLoadScene extends Phaser.Scene {
         this.scene.start("FarmScene", {
           world: NetworkManager.worldConfig
         });
+        this.scene.launch('UIScene');
       });
     }
   }

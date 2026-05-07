@@ -24,7 +24,6 @@ export default class BootScene extends Phaser.Scene {
       this.assetManager.createAnimations();
 
       this.scene.start('WorldLoadScene');      
-      this.scene.launch('UIScene');
     } else {
       console.error("Bunny textures missing! Check file paths in AssetManager.");
     }
