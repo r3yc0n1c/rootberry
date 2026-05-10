@@ -80,6 +80,13 @@ func handleAction(room *game.Room, p *game.Player, m Message) {
 	room.Mutex.Lock()
 	defer room.Mutex.Unlock()
 
+	isValidTile := func(x, y int) bool {
+		return x >= 0 &&
+			y >= 0 &&
+			x < config.FarmWorld.Size.Width &&
+			y < config.FarmWorld.Size.Height
+	}
+
 	switch m.Type {
 
 	case "move":
@@ -95,32 +102,71 @@ func handleAction(room *game.Room, p *game.Player, m Message) {
 		}
 
 	case "till":
+		if !isValidTile(m.X, m.Y) {
+			return
+		}
+
 		tile := room.World.Tiles[m.Y][m.X]
-		tile.Type = "tilled"
+
+		// only grass or farm tiles can be tilled
+		if tile.Type == "grass" || tile.Type == "farm" {
+			tile.Type = "tilled"
+			tile.Watered = false
+		}
+
 		p.State = "hoe"
 		room.BroadcastLocked()
 
-	case "plant":
-		tile := room.World.Tiles[m.Y][m.X]
-		if tile.Type == "tilled" {
-			tile.Crop = game.NewCrop("carrot")
-		}
-		p.State = "idle"
-		room.BroadcastLocked()
-
 	case "water":
+		if !isValidTile(m.X, m.Y) {
+			return
+		}
+
 		tile := room.World.Tiles[m.Y][m.X]
-		tile.Watered = true
+
+		// only tilled soil can be watered
+		if tile.Type == "tilled" {
+			tile.Watered = true
+		}
+
 		p.State = "water"
 		room.BroadcastLocked()
 
-	case "harvest":
-		tile := room.World.Tiles[m.Y][m.X]
-		if tile.Crop != nil && tile.Crop.Growth >= tile.Crop.MaxGrowth {
-			p.Money += 10
-			tile.Crop = nil
-			tile.Type = "grass"
+	case "plant":
+		if !isValidTile(m.X, m.Y) {
+			return
 		}
+
+		tile := room.World.Tiles[m.Y][m.X]
+
+		// must be tilled + watered
+		if tile.Type == "tilled" &&
+			tile.Watered &&
+			tile.Crop == nil {
+
+			tile.Crop = game.NewCrop("carrot")
+		}
+
+		p.State = "idle"
+		room.BroadcastLocked()
+
+	case "harvest":
+		if !isValidTile(m.X, m.Y) {
+			return
+		}
+
+		tile := room.World.Tiles[m.Y][m.X]
+
+		if tile.Crop != nil &&
+			tile.Crop.Growth >= tile.Crop.MaxGrowth {
+
+			p.Money += 10
+
+			tile.Crop = nil
+			tile.Type = "farm"
+			tile.Watered = false
+		}
+
 		p.State = "idle"
 		room.BroadcastLocked()
 	}

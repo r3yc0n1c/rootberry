@@ -40,15 +40,18 @@ func NewRoom(id string) *Room {
 	room := &Room{
 		ID:      id,
 		World:   NewWorld(
-			config.FarmWorld.Size.Width, 
+			config.FarmWorld.Size.Width,
 			config.FarmWorld.Size.Height,
 		),
 		Clients: make(map[string]*Client),
 		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
+	// Initialize farm plot tiles
+	room.World.InitializeFarmPlots()
+
 	room.StartHeartbeat()
-	
+
 	return room
 }
 
