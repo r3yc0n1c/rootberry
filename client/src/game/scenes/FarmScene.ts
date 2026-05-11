@@ -1,10 +1,11 @@
 import Phaser from 'phaser'
 import NetworkManager from '../managers/NetworkManager'
 import Player from '../entities/Player'
+import InventoryManager from '../managers/InventoryManager'
+import InventoryDock from '../ui/InventoryDock'
 
-
-const TILE = 16;
-const SCALE = 2;
+const TILE = 16
+const SCALE = 2
 
 const KEY_CONFIG = {
   UP: Phaser.Input.Keyboard.KeyCodes.W,
@@ -13,173 +14,196 @@ const KEY_CONFIG = {
   RIGHT: Phaser.Input.Keyboard.KeyCodes.D,
   ACTION: Phaser.Input.Keyboard.KeyCodes.E,
   INVENTORY: Phaser.Input.Keyboard.KeyCodes.I,
-  RUN: Phaser.Input.Keyboard.KeyCodes.SHIFT
-};
+  RUN: Phaser.Input.Keyboard.KeyCodes.SHIFT,
+  ITEM_1: Phaser.Input.Keyboard.KeyCodes.ONE,
+  ITEM_2: Phaser.Input.Keyboard.KeyCodes.TWO,
+  ITEM_3: Phaser.Input.Keyboard.KeyCodes.THREE,
+  ITEM_4: Phaser.Input.Keyboard.KeyCodes.FOUR,
+  ITEM_5: Phaser.Input.Keyboard.KeyCodes.FIVE,
+  ITEM_6: Phaser.Input.Keyboard.KeyCodes.SIX,
+}
 
 export default class FarmScene extends Phaser.Scene {
-  private worldConfig: any;
-  players: Map<string, Player> = new Map();
-  private isMoving = false;
-  private isActing = false;
-  private controls!: Record<keyof typeof KEY_CONFIG, Phaser.Input.Keyboard.Key>;
+  private worldConfig: any
+  players: Map<string, Player> = new Map()
+  private isMoving = false
+  private isActing = false
+  private controls!: Record<keyof typeof KEY_CONFIG, Phaser.Input.Keyboard.Key>
 
-  private farmingLayer!: Phaser.Tilemaps.TilemapLayer;
-  private cropLayer!: Phaser.Tilemaps.TilemapLayer;
-  private detailLayer!: Phaser.Tilemaps.TilemapLayer;
-  private obstacleLayer!: Phaser.Tilemaps.TilemapLayer;
-  private treeLayer!: Phaser.Tilemaps.TilemapLayer;
-  private houseLayer!: Phaser.Tilemaps.TilemapLayer;
-  private groundLayer!: Phaser.Tilemaps.TilemapLayer;
-  private backgroundLayer!: Phaser.Tilemaps.TilemapLayer;
+  private farmingLayer!: Phaser.Tilemaps.TilemapLayer
+  private cropLayer!: Phaser.Tilemaps.TilemapLayer
+  private detailLayer!: Phaser.Tilemaps.TilemapLayer
+  private obstacleLayer!: Phaser.Tilemaps.TilemapLayer
+  private treeLayer!: Phaser.Tilemaps.TilemapLayer
+  private houseLayer!: Phaser.Tilemaps.TilemapLayer
+  private groundLayer!: Phaser.Tilemaps.TilemapLayer
+  private backgroundLayer!: Phaser.Tilemaps.TilemapLayer
 
-
-  private lastSentPos = { x: -1, y: -1 };
-  private lastWorldHash = '';
+  private lastSentPos = { x: -1, y: -1 }
+  private lastWorldHash = ''
 
   // Farm plot boundaries
   private farmPlot!: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
+    x: number
+    y: number
+    width: number
+    height: number
+  }
 
-  private farmTiles = new Set<string>();
+  private farmTiles = new Set<string>()
+
+  // === Inventory system (fixed HUD layer) ===
+  private inventoryManager!: InventoryManager
+  private inventoryDock!: InventoryDock
 
   constructor() {
-    super('FarmScene');
+    super('FarmScene')
   }
 
   init(data: any) {
-    this.worldConfig = data.world;
+    this.worldConfig = data.world
   }
 
   create() {
     if (!this.worldConfig) {
-      console.error("Missing worldConfig!");
-      return;
+      console.error("Missing worldConfig!")
+      return
     }
 
-    this.controls = this.input.keyboard!.addKeys(KEY_CONFIG) as any;
+    this.controls = this.input.keyboard!.addKeys(KEY_CONFIG) as any
 
-    const MAP_SIZE_X = this.worldConfig.width;
-    const MAP_SIZE_Y = this.worldConfig.height;
-    const worldPx = MAP_SIZE_X * TILE * SCALE;
-    const worldPy = MAP_SIZE_Y * TILE * SCALE;
+    // --- A. TILEMAP SETUP ---
+    const MAP_SIZE_X = this.worldConfig.width
+    const MAP_SIZE_Y = this.worldConfig.height
+    const worldPx = MAP_SIZE_X * TILE * SCALE
+    const worldPy = MAP_SIZE_Y * TILE * SCALE
 
     const map = this.make.tilemap({
       width: MAP_SIZE_X,
       height: MAP_SIZE_Y,
       tileWidth: TILE,
-      tileHeight: TILE
-    });
+      tileHeight: TILE,
+    })
 
     // --- ASSET LOADING ---
-    const grassTileset = map.addTilesetImage('grass', 'grass');
-    const natureTileset = map.addTilesetImage('nature', 'nature');
-    const cropTileset = map.addTilesetImage('crops', 'crops');
-    const exteriorTileset = map.addTilesetImage('exterior', 'exterior', 16, 16, 0, 0, natureTileset!.total);
-    // House tileset uses "exterior" image but different GIDs, so we add it as a separate tileset to get its own firstgid
-    const houseTileset = map.addTilesetImage('house', 'house', 16, 16, 0, 0, natureTileset!.total + exteriorTileset!.total);
+    const grassTileset = map.addTilesetImage('grass', 'grass')
+    const natureTileset = map.addTilesetImage('nature', 'nature')
+    const cropTileset = map.addTilesetImage('crops', 'crops')
+    const exteriorTileset = map.addTilesetImage(
+      'exterior',
+      'exterior',
+      16,
+      16,
+      0,
+      0,
+      natureTileset!.total
+    )
+    const houseTileset = map.addTilesetImage(
+      'house',
+      'house',
+      16,
+      16,
+      0,
+      0,
+      natureTileset!.total + exteriorTileset!.total
+    )
+    const floorDetailsTileset = map.addTilesetImage(
+      'floor_details',
+      'floor_details',
+      16,
+      16,
+      0,
+      0,
+      natureTileset!.total + exteriorTileset!.total
+    )
 
-    const floorDetailsTileset = map.addTilesetImage('floor_details', 'floor_details', 16, 16, 0, 0, natureTileset!.total + exteriorTileset!.total);
-
-    if (!grassTileset || !exteriorTileset || !natureTileset || !cropTileset || !houseTileset || !floorDetailsTileset) {
-      console.error("Missing Tilesets! Check AssetManager.");
-      return;
+    if (
+      !grassTileset ||
+      !exteriorTileset ||
+      !natureTileset ||
+      !cropTileset ||
+      !houseTileset ||
+      !floorDetailsTileset
+    ) {
+      console.error("Missing Tilesets! Check AssetManager.")
+      return
     }
 
     // --- B. LAYER SETUP ---
-    // LAYER 1: BASE (Solid Grass & Dirt Paths) - Depth 0
-    this.groundLayer = map.createBlankLayer('Ground', grassTileset)!.setScale(SCALE).setDepth(0);
+    this.groundLayer =
+      map.createBlankLayer('Ground', grassTileset)!.setScale(SCALE).setDepth(0)
 
-    // LAYER 2: FARMING (Tilled Plots & Wet Soil) - Depth 1, 2 (Separate layer for crops to appear above tilled soil)
-    this.farmingLayer = map.createBlankLayer('Farming', cropTileset)!.setScale(SCALE).setDepth(1);
-    this.cropLayer = map.createBlankLayer('Crops', cropTileset)!.setScale(SCALE).setDepth(2);
+    this.farmingLayer =
+      map.createBlankLayer('Farming', cropTileset)!.setScale(SCALE).setDepth(1)
+    this.cropLayer =
+      map.createBlankLayer('Crops', cropTileset)!.setScale(SCALE).setDepth(2)
 
-    this.backgroundLayer = map.createBlankLayer(
-      'BackgroundDecor',
-      [natureTileset, exteriorTileset]
-    )!
-      .setScale(SCALE)
-      .setDepth(2.5);
+    this.backgroundLayer =
+      map
+        .createBlankLayer('BackgroundDecor', [natureTileset, exteriorTileset])!
+        .setScale(SCALE)
+        .setDepth(2.5)
 
-    // LAYER 3: OBSTACLES (Fences, House Base, Bottom of Trees) - Depth 3
-    this.obstacleLayer = map.createBlankLayer(
-      'Obstacles',
-      [exteriorTileset, houseTileset] // multiple tilesets
-    )!
-      .setScale(SCALE)
-      .setDepth(3);
+    this.obstacleLayer =
+      map
+        .createBlankLayer('Obstacles', [exteriorTileset, houseTileset])!
+        .setScale(SCALE)
+        .setDepth(3)
 
-    this.treeLayer = map.createBlankLayer(
-      'Trees',
-      [natureTileset]
-    )!
-      .setScale(SCALE)
-      .setDepth(3.1);
+    this.treeLayer =
+      map
+        .createBlankLayer('Trees', [natureTileset])!
+        .setScale(SCALE)
+        .setDepth(3.1)
 
-    this.houseLayer = map.createBlankLayer(
-      'House',
-      [houseTileset]
-    )!
-      .setScale(SCALE)
-      .setDepth(3.2);
+    this.houseLayer =
+      map
+        .createBlankLayer('House', [houseTileset])!
+        .setScale(SCALE)
+        .setDepth(3.2)
 
-    this.detailLayer = map.createBlankLayer('Details', [houseTileset, floorDetailsTileset])!
-      .setScale(SCALE)
-      .setDepth(3.3); // For things like windows that should be above obstacles but below players
-
-    console.log('natureTileset.firstgid:', natureTileset.firstgid);
-    console.log('exteriorTileset.firstgid:', exteriorTileset.firstgid);
-    console.log('houseTileset.firstgid:', houseTileset.firstgid);
-
-    // [cite: LAYER 4: ENTITIES] (Player sprite, Cow, Chicken) - Depth 4 (Set in entity class)
-
-    // LAYER 5: OVERHEAD (Roofs, Top of Trees) - Depth 5
-
+    this.detailLayer =
+      map
+        .createBlankLayer('Details', [houseTileset, floorDetailsTileset])!
+        .setScale(SCALE)
+        .setDepth(3.3)
 
     // Helpers
-    const NAT = (i: number) => natureTileset.firstgid + i;
-    const EXT = (i: number) => exteriorTileset.firstgid + i;
-    const HOUSE = (i: number) => houseTileset.firstgid + i;
-    const FLOOR = (i: number) => floorDetailsTileset.firstgid + i;
+    const NAT = (i: number) => natureTileset.firstgid + i
+    const EXT = (i: number) => exteriorTileset.firstgid + i
+    const HOUSE = (i: number) => houseTileset.firstgid + i
+    const FLOOR = (i: number) => floorDetailsTileset.firstgid + i
 
     const details = {
       flower1: FLOOR(13),
       flower2: FLOOR(24),
       tillableDirt: FLOOR(37),
-
       grassTileSet: {
         grass: 73,
       },
-
       grassGroupL: [
         [FLOOR(17), FLOOR(18)],
-        [FLOOR(28), FLOOR(29)]
+        [FLOOR(28), FLOOR(29)],
       ],
       grassGroupS: [
         [FLOOR(19), FLOOR(20)],
-        [FLOOR(30), FLOOR(31)]
+        [FLOOR(30), FLOOR(31)],
       ],
       lampPost: [
         [EXT(39), EXT(40)],
-        [EXT(64), EXT(65)]
+        [EXT(64), EXT(65)],
       ],
       noticeBoard: [
         [EXT(47), EXT(48)],
-        [EXT(72), EXT(73)]
-      ]
+        [EXT(72), EXT(73)],
+      ],
     }
 
     // =========================================
-    // --- E. GENERATE WORLD ( procedural) ---
+    // --- E. GENERATE WORLD (procedural) ---
     // =========================================
+    this.groundLayer.fill(details.grassTileSet.grass)
 
-    // Fill the entire world with grass
-    this.groundLayer.fill(details.grassTileSet.grass);
-
-    // draw fence
     const fenceTile = {
       verticalLeft: EXT(55),
       verticalRight: EXT(57),
@@ -189,42 +213,33 @@ export default class FarmScene extends Phaser.Scene {
       bottomLeftCorner: EXT(80),
       bottomRightCorner: EXT(82),
       horizontalBrokenUp: EXT(33),
-      horizontalBrokendown: EXT(83)
-    };
+      horizontalBrokendown: EXT(83),
+    }
 
-    this.obstacleLayer.putTileAt(fenceTile.topLeftCorner, 0, 0);
-    // this.obstacleLayer.putTileAt(fenceTile.topRightCorner, MAP_SIZE_X - 1, 0);
-
+    this.obstacleLayer.putTileAt(fenceTile.topLeftCorner, 0, 0)
     for (let x = 1; x < MAP_SIZE_X; x++) {
-      this.obstacleLayer.putTileAt(fenceTile.horizontal, x, 0);
-      // this.obstacleLayer.putTileAt(fenceTile.horizontal, x, MAP_SIZE_Y - 1);
+      this.obstacleLayer.putTileAt(fenceTile.horizontal, x, 0)
     }
-
-    // this.obstacleLayer.putTileAt(fenceTile.bottomLeftCorner, 0, MAP_SIZE_Y - 1);
-    // this.obstacleLayer.putTileAt(fenceTile.bottomRightCorner, MAP_SIZE_X - 1, MAP_SIZE_Y - 1);
-
     for (let y = 1; y < MAP_SIZE_Y; y++) {
-      this.obstacleLayer.putTileAt(fenceTile.verticalLeft, 0, y);
-      // this.obstacleLayer.putTileAt(fenceTile.verticalRight, MAP_SIZE_X - 1, y);
+      this.obstacleLayer.putTileAt(fenceTile.verticalLeft, 0, y)
     }
 
-    // THE HOUSE (Top Center-Left)
-    const houseX = 3;
-    const houseY = 1;
-
+    // THE HOUSE
+    const houseX = 3
+    const houseY = 1
     const roofTiles = [
       [51, 51, 42, 51, 51],
       [44, 53, 118, 54, 45],
       [82, 91, 81, 92, 83],
       [120, 129, 119, 130, 121],
-      [115, 209, 111, 209, 116]
-    ].map(row => row.map(HOUSE));
+      [115, 209, 111, 209, 116],
+    ].map((row) => row.map(HOUSE))
 
-    this.houseLayer.putTilesAt(roofTiles, houseX, houseY - 2);
-    this.detailLayer.putTileAt(HOUSE(68), houseX + 2, houseY + 1);    // top window
-    this.detailLayer.putTileAt(HOUSE(377), houseX + 2, houseY + 2);   // main door shed
-    this.detailLayer.putTileAt(HOUSE(182), houseX + 1, houseY + 2);   // left window
-    this.detailLayer.putTileAt(HOUSE(182), houseX + 3, houseY + 2);   // right window
+    this.houseLayer.putTilesAt(roofTiles, houseX, houseY - 2)
+    this.detailLayer.putTileAt(HOUSE(68), houseX + 2, houseY + 1)
+    this.detailLayer.putTileAt(HOUSE(377), houseX + 2, houseY + 2)
+    this.detailLayer.putTileAt(HOUSE(182), houseX + 1, houseY + 2)
+    this.detailLayer.putTileAt(HOUSE(182), houseX + 3, houseY + 2)
 
     // trees
     const treeTiles = {
@@ -232,35 +247,31 @@ export default class FarmScene extends Phaser.Scene {
         [90, 91, 92, 93],
         [111, 112, 113, 114],
         [132, 133, 134, 135],
-      ].map(row => row.map(NAT)),
-
+      ].map((row) => row.map(NAT)),
       pineSingle: [
         [45, 46],
         [66, 67],
-      ].map(row => row.map(NAT)),
-
+      ].map((row) => row.map(NAT)),
       bigTree: [
         [22, 23],
         [43, 44],
-        [64, 65]
-      ].map(row => row.map(NAT))
+        [64, 65],
+      ].map((row) => row.map(NAT)),
     }
 
     const wellTiles = [
       [135, 136],
       [160, 161],
-    ].map(row => row.map(EXT))
+    ].map((row) => row.map(EXT))
 
-    this.treeLayer.putTilesAt(treeTiles.pineGroup, 0, 0);
-    this.treeLayer.putTilesAt(treeTiles.pineSingle, 7, 0);
-    this.backgroundLayer.putTilesAt(wellTiles, 8, 2);
+    this.treeLayer.putTilesAt(treeTiles.pineGroup, 0, 0)
+    this.treeLayer.putTilesAt(treeTiles.pineSingle, 7, 0)
+    this.backgroundLayer.putTilesAt(wellTiles, 8, MAP_SIZE_Y - 3)
 
-    this.backgroundLayer.putTileAt(NAT(153), 1, 3);
-    this.backgroundLayer.putTileAt(NAT(39), 1, 4);
-    this.backgroundLayer.putTileAt(EXT(70), 2, 3);
-
-    this.treeLayer.putTilesAt(treeTiles.bigTree, 1, 4);
-
+    this.backgroundLayer.putTileAt(NAT(153), 1, 3)
+    this.backgroundLayer.putTileAt(NAT(39), 1, 4)
+    this.backgroundLayer.putTileAt(EXT(70), 2, 3)
+    this.treeLayer.putTilesAt(treeTiles.bigTree, 1, 4)
 
     // Draw the "z-Shaped" Path
     const groundTiles = {
@@ -276,179 +287,106 @@ export default class FarmScene extends Phaser.Scene {
       bottomLeftEdge: 40,
       topRightEdge: 60,
       topLeftEdge: 61,
-    };
+    }
 
+    this.groundLayer.putTileAt(57, 5, 4)
+    this.groundLayer.putTileAt(78, 5, 5)
+    this.groundLayer.putTileAt(60, 6, 4)
 
-    this.groundLayer.putTileAt(57, 5, 4);
-    this.groundLayer.putTileAt(78, 5, 5);
-    this.groundLayer.putTileAt(60, 6, 4);
-    // Horizontal path from house to right
-    let x;
+    let x: number, y: number
     for (x = 7; x < 18; x++) {
-      this.groundLayer.putTileAt(groundTiles.top, x, 4);
-      this.groundLayer.putTileAt(groundTiles.bottom, x - 1, 5);
+      this.groundLayer.putTileAt(groundTiles.top, x, 4)
+      this.groundLayer.putTileAt(groundTiles.bottom, x - 1, 5)
     }
 
-    this.groundLayer.putTileAt(groundTiles.topRightCorner, x, 4);
-    this.groundLayer.putTileAt(groundTiles.right, x, 5);
-    this.groundLayer.putTileAt(groundTiles.bottomLeftEdge, --x, 5);
+    this.groundLayer.putTileAt(groundTiles.topRightCorner, x, 4)
+    this.groundLayer.putTileAt(groundTiles.right, x, 5)
+    this.groundLayer.putTileAt(groundTiles.bottomLeftEdge, --x, 5)
 
-    // Vertical path down the right side
-    let y;
     for (y = 6; y < 20; y++) {
-      this.groundLayer.putTileAt(groundTiles.left, x, y);
-      this.groundLayer.putTileAt(groundTiles.right, x + 1, y);
+      this.groundLayer.putTileAt(groundTiles.left, x, y)
+      this.groundLayer.putTileAt(groundTiles.right, x + 1, y)
     }
 
-    this.groundLayer.putTileAt(groundTiles.left, x, y++);
-    this.groundLayer.putTileAt(groundTiles.bottomLeftCorner, x++, y);
-    this.groundLayer.putTileAt(groundTiles.topRightEdge, x, y - 1);
+    this.groundLayer.putTileAt(groundTiles.left, x, y++)
+    this.groundLayer.putTileAt(groundTiles.bottomLeftCorner, x++, y)
+    this.groundLayer.putTileAt(groundTiles.topRightEdge, x, y - 1)
 
-    // Horizontal path back left at the bottom
     for (; x < 40; x++) {
-      this.groundLayer.putTileAt(groundTiles.top, x + 1, y - 1);
-      this.groundLayer.putTileAt(groundTiles.bottom, x, y);
+      this.groundLayer.putTileAt(groundTiles.top, x + 1, y - 1)
+      this.groundLayer.putTileAt(groundTiles.bottom, x, y)
     }
 
     // =========================================
     // Farming Area (Center)
     // =========================================
-    const DIRT = 58;
+    const DIRT = 58
     this.farmPlot = {
       x: 4,
       y: 9,
       width: 9,
-      height: 7
-    };
+      height: 7,
+    }
 
-    const startX = this.farmPlot.x;
-    const startY = this.farmPlot.y;
+    const startX = this.farmPlot.x
+    const startY = this.farmPlot.y
+    const endX = startX + this.farmPlot.width - 1
+    const endY = startY + this.farmPlot.height - 1
 
-    const endX = startX + this.farmPlot.width - 1;
-    const endY = startY + this.farmPlot.height - 1;
-
-    // =========================================
-    // Open farmland area (ground only)
-    // =========================================
-
-    for (let y = startY; y <= endY; y++) {
-      for (let x = startX; x <= endX; x++) {
-        const isFarmSpot = (x - startX) % 2 === 0 && (y - startY) % 2 === 0;
+    for (let y2 = startY; y2 <= endY; y2++) {
+      for (let x2 = startX; x2 <= endX; x2++) {
+        const isFarmSpot =
+          (x2 - startX) % 2 === 0 && (y2 - startY) % 2 === 0
         if (isFarmSpot) {
-          this.detailLayer.putTileAt(details.tillableDirt, x, y);
+          this.detailLayer.putTileAt(details.tillableDirt, x2, y2)
         }
-        this.groundLayer.putTileAt(DIRT, x, y);
-        // groundLayer.putTileAt(isFarmSpot ? DIRT_DARK : DIRT, x, y);
+        this.groundLayer.putTileAt(DIRT, x2, y2)
         if (isFarmSpot) {
-          this.farmTiles.add(`${x},${y}`);
+          this.farmTiles.add(`${x2},${y2}`)
         }
       }
     }
 
-    // =========================================
-    // Farm Plot Boundaries (no tiles - empty)
-    // =========================================
-    // farmingLayer stays empty; tilled soil renders only when server sends state
-
-    // Store farm bounds for validation
     this.farmPlot = {
       x: startX,
       y: startY,
       width: this.farmPlot.width,
-      height: this.farmPlot.height
-    };
-
-    // =========================================
-    // Ground Border Top + Bottom
-    // =========================================
-
-    for (let x = startX; x <= endX; x++) {
-      this.groundLayer.putTileAt(
-        groundTiles.top,
-        x,
-        startY - 1
-      );
-
-      this.groundLayer.putTileAt(
-        groundTiles.bottom,
-        x,
-        endY + 1
-      );
+      height: this.farmPlot.height,
     }
 
-    // =========================================
-    // Ground Border Left + Right
-    // =========================================
-
-    for (let y = startY; y <= endY; y++) {
-      this.groundLayer.putTileAt(
-        groundTiles.left,
-        startX - 1,
-        y
-      );
-
-      this.groundLayer.putTileAt(
-        groundTiles.right,
-        endX + 1,
-        y
-      );
+    // Borders
+    for (let x2 = startX; x2 <= endX; x2++) {
+      this.groundLayer.putTileAt(groundTiles.top, x2, startY - 1)
+      this.groundLayer.putTileAt(groundTiles.bottom, x2, endY + 1)
     }
-
-    // =========================================
-    // Corners
-    // =========================================
-
-    this.groundLayer.putTileAt(
-      groundTiles.topLeftCorner,
-      startX - 1,
-      startY - 1
-    );
-
-    this.groundLayer.putTileAt(
-      groundTiles.topRightCorner,
-      endX + 1,
-      startY - 1
-    );
-
-    this.groundLayer.putTileAt(
-      groundTiles.bottomLeftCorner,
-      startX - 1,
-      endY + 1
-    );
-
+    for (let y2 = startY; y2 <= endY; y2++) {
+      this.groundLayer.putTileAt(groundTiles.left, startX - 1, y2)
+      this.groundLayer.putTileAt(groundTiles.right, endX + 1, y2)
+    }
+    this.groundLayer.putTileAt(groundTiles.topLeftCorner, startX - 1, startY - 1)
+    this.groundLayer.putTileAt(groundTiles.topRightCorner, endX + 1, startY - 1)
+    this.groundLayer.putTileAt(groundTiles.bottomLeftCorner, startX - 1, endY + 1)
     this.groundLayer.putTileAt(
       groundTiles.bottomRightCorner,
       endX + 1,
       endY + 1
-    );
+    )
 
     // Top Fence
-
-    for (let x = startX - 1; x <= endX + 1; x++) {
-      this.obstacleLayer.putTileAt(
-        fenceTile.horizontalBrokenUp,
-        x,
-        startY - 2
-      );
+    for (let x2 = startX - 1; x2 <= endX + 1; x2++) {
+      this.obstacleLayer.putTileAt(fenceTile.horizontalBrokenUp, x2, startY - 2)
     }
-
     // Bottom Fence
-
-    for (let x = startX - 1; x <= endX + 1; x++) {
-      this.obstacleLayer.putTileAt(
-        fenceTile.horizontalBrokenUp,
-        x,
-        endY + 2
-      );
+    for (let x2 = startX - 1; x2 <= endX + 1; x2++) {
+      this.obstacleLayer.putTileAt(fenceTile.horizontalBrokenUp, x2, endY + 2)
     }
-
 
     // Pond
     const pondTiles = [
       [175, 199, 199, 199, 199, 199, 199, 199, 199, 199, 199, 199, 199, 174],
       [180, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 156],
       [180, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 156],
-    ].map(row => row.map(NAT));
+    ].map((row) => row.map(NAT))
 
     const pondEco = {
       lotus: NAT(162),
@@ -458,7 +396,7 @@ export default class FarmScene extends Phaser.Scene {
       bubbles: NAT(163),
       waterStoneWithMossXL: [
         [NAT(119), NAT(120)],
-        [NAT(140), NAT(141)]
+        [NAT(140), NAT(141)],
       ],
       waterBamboo: NAT(74),
     }
@@ -466,415 +404,402 @@ export default class FarmScene extends Phaser.Scene {
     const bridgeTiles = [
       [183, 184, 184, 185],
       [208, 209, 209, 210],
-      [233, 234, 234, 235]
-    ].map(row => row.map(EXT));
+      [233, 234, 234, 235],
+    ].map((row) => row.map(EXT))
 
-    this.groundLayer.putTilesAt(pondTiles, 1, MAP_SIZE_Y - 3);
-    this.backgroundLayer.putTilesAt(bridgeTiles, pondTiles[0].length - 3, MAP_SIZE_Y - 2);
-    this.backgroundLayer.putTileAt(pondEco.bubbles, 4, MAP_SIZE_Y - 2);
-    this.backgroundLayer.putTileAt(pondEco.lilyPad, 2, MAP_SIZE_Y - 1);
-    this.backgroundLayer.putTileAt(pondEco.lotus, 3, MAP_SIZE_Y - 1);
+    this.groundLayer.putTilesAt(pondTiles, 1, MAP_SIZE_Y - 3)
+    this.backgroundLayer.putTilesAt(
+      bridgeTiles,
+      pondTiles[0].length - 3,
+      MAP_SIZE_Y - 2
+    )
+    this.backgroundLayer.putTileAt(pondEco.bubbles, 4, MAP_SIZE_Y - 2)
+    this.backgroundLayer.putTileAt(pondEco.lilyPad, 2, MAP_SIZE_Y - 1)
+    this.backgroundLayer.putTileAt(pondEco.lotus, 3, MAP_SIZE_Y - 1)
     this.backgroundLayer.putTilesAt(
       pondEco.waterStoneWithMossXL,
       2,
       MAP_SIZE_Y - 3
-    );
-    this.backgroundLayer.putTileAt(pondEco.lotus, 8, MAP_SIZE_Y - 2);
-    this.backgroundLayer.putTileAt(pondEco.waterBamboo, 10, MAP_SIZE_Y - 2);
+    )
+    this.backgroundLayer.putTileAt(pondEco.lotus, 8, MAP_SIZE_Y - 2)
+    this.backgroundLayer.putTileAt(pondEco.waterBamboo, 10, MAP_SIZE_Y - 2)
 
-    this.treeLayer.putTilesAt(treeTiles.pineSingle, 14, MAP_SIZE_Y - 6);
-    this.treeLayer.putTilesAt(treeTiles.pineSingle, 1, MAP_SIZE_Y - 6);
+    this.treeLayer.putTilesAt(treeTiles.pineSingle, 14, MAP_SIZE_Y - 6)
+    this.treeLayer.putTilesAt(treeTiles.pineSingle, 1, MAP_SIZE_Y - 6)
 
-    this.detailLayer.putTileAt(details.flower2, 14, MAP_SIZE_Y - 3);
-
-    this.detailLayer.putTilesAt(details.grassGroupS, 15, MAP_SIZE_Y - 2);
-
-    this.obstacleLayer.putTilesAt(details.lampPost, 15, MAP_SIZE_Y - 4);
-
-    this.obstacleLayer.putTilesAt(details.noticeBoard, 19, MAP_SIZE_Y - 4);
-
-    this.obstacleLayer.putTilesAt(details.noticeBoard, 19, MAP_SIZE_Y - 4);
-
+    this.detailLayer.putTileAt(details.flower2, 14, MAP_SIZE_Y - 3)
+    this.detailLayer.putTilesAt(details.grassGroupS, 15, MAP_SIZE_Y - 2)
+    this.obstacleLayer.putTilesAt(details.lampPost, 15, MAP_SIZE_Y - 4)
+    this.obstacleLayer.putTilesAt(details.noticeBoard, 19, MAP_SIZE_Y - 4)
 
     // --- G. FINALIZE SETUP ---
-    this.cameras.main.setBounds(0, 0, worldPx, worldPy);
-    this.cameras.main.setZoom(1);
-    // this.cameras.main.centerOn(worldPx / 2, worldPy / 2);
+    this.cameras.main.setBounds(0, 0, worldPx, worldPy)
+    this.cameras.main.setZoom(1)
 
-    // Center camera on world spawn
-    const spawnPxX = this.worldConfig.spawn.x * TILE * SCALE;
-    const spawnPxY = this.worldConfig.spawn.y * TILE * SCALE;
-    this.cameras.main.centerOn(spawnPxX, spawnPxY);
+    const spawnPxX = this.worldConfig.spawn.x * TILE * SCALE
+    const spawnPxY = this.worldConfig.spawn.y * TILE * SCALE
+    this.cameras.main.centerOn(spawnPxX, spawnPxY)
 
-    // Start network synchronization loop (same as before)
+    // Start network synchronization loop
     this.time.addEvent({
       delay: 100,
       loop: true,
       callback: () => this.syncWorld(),
-    });
+    })
+
+    // =============================================
+    // H. INVENTORY HUD — Fixed overlay on camera
+    // =============================================
+    this.inventoryManager = new InventoryManager()
+    this.inventoryDock = new InventoryDock(this, this.inventoryManager)
+
+    // The dock container is already set with setScrollFactor(0) so it stays
+    // fixed on screen while the camera pans the world below it.
+    // Depth 1000 ensures it renders above all world layers.
   }
 
   syncWorld() {
-    const world = NetworkManager.worldState;
-    const myId = NetworkManager.playerId;
+    const world = NetworkManager.worldState
+    const myId = NetworkManager.playerId
 
-    if (!world || !world.players) return;
+    if (!world || !world.players) return
 
-    // prevent re-render spam
-    const hash = JSON.stringify(world.tiles);
+    const hash = JSON.stringify(world.tiles)
     if (hash !== this.lastWorldHash) {
-      this.renderWorldFromServer(world);
-      this.lastWorldHash = hash;
+      this.renderWorldFromServer(world)
+      this.lastWorldHash = hash
     }
 
-    // Create a set of IDs currently sent by the server
-    const activeIds = new Set(Object.keys(world.players));
+    const activeIds = new Set(Object.keys(world.players))
 
-    // Remove players who are no longer "nearby"
     this.players.forEach((sprite, id) => {
       if (!activeIds.has(id) && id !== myId) {
-        sprite.destroy(); // Remove the Bunny from the screen
-        this.players.delete(id);
+        sprite.destroy()
+        this.players.delete(id)
       }
-    });
+    })
 
-    // Update or Add the nearby players
     Object.values(world.players).forEach((p: any) => {
-      const targetX = p.x * TILE * SCALE;
-      const targetY = p.y * TILE * SCALE;
+      const targetX = p.x * TILE * SCALE
+      const targetY = p.y * TILE * SCALE
 
       if (!this.players.has(p.id)) {
-        let spawnX = p.x;
-        let spawnY = p.y;
+        let spawnX = p.x
+        let spawnY = p.y
 
-        // fallback if server sends nothing (future-proof)
         if (!spawnX || !spawnY) {
-          spawnX = this.worldConfig.spawn.x;
-          spawnY = this.worldConfig.spawn.y;
+          spawnX = this.worldConfig.spawn.x
+          spawnY = this.worldConfig.spawn.y
         }
 
-        const newPlayerTargetX = spawnX * TILE * SCALE;
-        const newPlayerTargetY = spawnY * TILE * SCALE;
+        const newPlayerTargetX = spawnX * TILE * SCALE
+        const newPlayerTargetY = spawnY * TILE * SCALE
 
-        const playerInstance = new Player(this, newPlayerTargetX, newPlayerTargetY, p.id);
-        this.players.set(p.id, playerInstance);
+        const playerInstance = new Player(
+          this,
+          newPlayerTargetX,
+          newPlayerTargetY,
+          p.id
+        )
+        this.players.set(p.id, playerInstance)
 
-        // POKEMON STYLE: Follow ONLY when near center of world
         if (p.id === myId) {
-          // true = roundPixels to prevent blurry bunny
-          this.cameras.main.startFollow(playerInstance, true, 0.2, 0.2);
-          // Small deadzone so bunny moves a bit before camera follows
-          this.cameras.main.setDeadzone(50, 50);
-
-          this.lastSentPos = { x: p.x, y: p.y };
+          this.cameras.main.startFollow(playerInstance, true, 0.2, 0.2)
+          this.cameras.main.setDeadzone(50, 50)
+          this.lastSentPos = { x: p.x, y: p.y }
         }
       }
 
-      const sprite = this.players.get(p.id);
-      if (!sprite) return;
+      const sprite = this.players.get(p.id)
+      if (!sprite) return
 
-      // LOCAL PLAYER: Only sync state, don't tween position (prevents fighting with controls)
       if (p.id === myId) {
-        // We only snap if we are WAY off (like a collision failed)
         if (!this.isMoving) {
-          const dist = Phaser.Math.Distance.Between(sprite.x, sprite.y, targetX, targetY);
-          if (dist > (TILE * SCALE * 1.5)) {
-            sprite.setPosition(targetX, targetY);
-            this.lastSentPos = { x: p.x, y: p.y }; // Reset tracker to server state
+          const dist = Phaser.Math.Distance.Between(
+            sprite.x,
+            sprite.y,
+            targetX,
+            targetY
+          )
+          if (dist > TILE * SCALE * 1.5) {
+            sprite.setPosition(targetX, targetY)
+            this.lastSentPos = { x: p.x, y: p.y }
           }
         }
-        return;
+        return
       }
 
-      // REMOTE PLAYERS: Handle smooth interpolation
-      const isMoving = Math.abs(sprite.x - targetX) > 2 || Math.abs(sprite.y - targetY) > 2;
+      const isMoving =
+        Math.abs(sprite.x - targetX) > 2 || Math.abs(sprite.y - targetY) > 2
 
-      // Calculate direction for animation
-      let dir = sprite.lastDir;
-      if (targetX > sprite.x) dir = 'right';
-      else if (targetX < sprite.x) dir = 'left';
-      else if (targetY > sprite.y) dir = 'up';
-      else if (targetY < sprite.y) dir = 'down';
+      let dir = sprite.lastDir
+      if (targetX > sprite.x) dir = 'right'
+      else if (targetX < sprite.x) dir = 'left'
+      else if (targetY > sprite.y) dir = 'up'
+      else if (targetY < sprite.y) dir = 'down'
 
-      sprite.updateDirection(dir, isMoving);
+      sprite.updateDirection(dir, isMoving)
 
-      // FIX: Stop existing tweens for this specific sprite to prevent jitter
-      this.tweens.killTweensOf(sprite);
+      this.tweens.killTweensOf(sprite)
 
       if (isMoving) {
-        this.tweens.killTweensOf(sprite); // Stop current movement before starting new one
+        this.tweens.killTweensOf(sprite)
 
         this.tweens.add({
           targets: sprite,
           x: targetX,
           y: targetY,
-          duration: 100, // Match your sync interval (100ms)
+          duration: 100,
           onStart: () => sprite.updateDirection(dir, true),
-          onComplete: () => sprite.updateDirection(dir, false)
-        });
+          onComplete: () => sprite.updateDirection(dir, false),
+        })
       } else {
-        // Snap to position if the distance is negligible
-        sprite.setPosition(targetX, targetY);
-        sprite.updateDirection(sprite.lastDir, false);
+        sprite.setPosition(targetX, targetY)
+        sprite.updateDirection(sprite.lastDir, false)
       }
-    });
+    })
   }
 
   update() {
-    const world = NetworkManager.worldState;
-    const playerId = NetworkManager.playerId;
+    const world = NetworkManager.worldState
+    const playerId = NetworkManager.playerId
 
-    // Ensure we have world data, our ID, and aren't mid-animation
     if (
       !world ||
       !world.players ||
       !playerId ||
       this.isMoving ||
       this.isActing
-    ) return;
+    )
+      return
 
-    const me = world.players[playerId];
-    const mySprite = this.players.get(playerId);
-    if (!me || !mySprite || this.isMoving) return;
+    const me = world.players[playerId]
+    const mySprite = this.players.get(playerId)
+    if (!me || !mySprite || this.isMoving) return
 
-    // --- Action Logic (Farming) ---
+    // --- Hotkeys 1-6 → inventory dock forwards to InventoryManager ---
+    // (handled by InventoryDock.setupEventListeners in the constructor)
+
+    // --- Action (E key) ---
     if (Phaser.Input.Keyboard.JustDown(this.controls.ACTION)) {
-      this.handleAction(mySprite);
-      return;
+      this.handleAction(mySprite)
+      return
     }
 
-    // --- Movement Logic ---
-
-    let { x, y } = this.lastSentPos; // Start from last sent position, not sprite position
-    let moved = false;
-    let direction = mySprite.lastDir; // Default to last direction if no input
+    // --- Movement ---
+    let { x, y } = this.lastSentPos
+    let moved = false
+    let direction = mySprite.lastDir
 
     if (this.controls.LEFT.isDown) {
-      x--; moved = true; direction = 'left';
+      x--
+      moved = true
+      direction = 'left'
     } else if (this.controls.RIGHT.isDown) {
-      x++; moved = true; direction = 'right';
+      x++
+      moved = true
+      direction = 'right'
     } else if (this.controls.UP.isDown) {
-      y--; moved = true; direction = 'up';
+      y--
+      moved = true
+      direction = 'up'
     } else if (this.controls.DOWN.isDown) {
-      y++; moved = true; direction = 'down';
+      y++
+      moved = true
+      direction = 'down'
     }
 
     if (moved) {
-      // IMMEDIATELY tell the sprite it is moving
       if (this.canMoveTo(x, y)) {
-        this.lastSentPos = { x, y };
-        this.handleMovement(x, y, direction, mySprite);
+        this.lastSentPos = { x, y }
+        this.handleMovement(x, y, direction, mySprite)
       } else {
-        // IDLE LOCALLY
-        mySprite.updateDirection(direction, false);
+        mySprite.updateDirection(direction, false)
       }
     }
   }
 
   private canMoveTo(tx: number, ty: number): boolean {
-    return tx > 0 && tx < this.worldConfig.width && ty > 0 && ty < this.worldConfig.height;
+    return tx > 0 && tx < this.worldConfig.width && ty > 0 && ty < this.worldConfig.height
   }
 
   private handleMovement(nextX: number, nextY: number, direction: string, sprite: Player) {
-    this.isMoving = true;
+    this.isMoving = true
 
-    const targetPxX = nextX * TILE * SCALE;
-    const targetPxY = nextY * TILE * SCALE;
+    const targetPxX = nextX * TILE * SCALE
+    const targetPxY = nextY * TILE * SCALE
 
-    const isRunning = this.controls.RUN.isDown;
-    const duration = isRunning ? 80 : 200;
+    const isRunning = this.controls.RUN.isDown
+    const duration = isRunning ? 80 : 200
 
-    // Move instantly on screen
     this.tweens.add({
       targets: sprite,
       x: targetPxX,
       y: targetPxY,
-      duration: duration,
+      duration,
       ease: 'Linear',
       onStart: () => sprite.updateDirection(direction, true),
       onComplete: () => {
-        this.isMoving = false;
-        // Check for idle
-        const anyKeyDown = this.controls.LEFT.isDown || this.controls.RIGHT.isDown || this.controls.UP.isDown || this.controls.DOWN.isDown;
-        if (!anyKeyDown) sprite.updateDirection(direction, false);
-      }
-    });
+        this.isMoving = false
+        const anyKeyDown =
+          this.controls.LEFT.isDown ||
+          this.controls.RIGHT.isDown ||
+          this.controls.UP.isDown ||
+          this.controls.DOWN.isDown
+        if (!anyKeyDown) sprite.updateDirection(direction, false)
+      },
+    })
 
-    // Send intended move to server
-    NetworkManager.send({ type: 'move', x: nextX, y: nextY });
+    NetworkManager.send({ type: 'move', x: nextX, y: nextY })
   }
 
   private isFarmTile(x: number, y: number): boolean {
-    return this.farmTiles.has(`${x},${y}`);
+    return this.farmTiles.has(`${x},${y}`)
+  }
+
+  /**
+   * Return the id of the currently selected inventory item, or null.
+   */
+  private getSelectedItemId(): string | null {
+    return this.inventoryManager.getSelectedItem()?.id ?? null
   }
 
   private handleAction(player: Player) {
+    const targetTile = player.getFacingTile()
 
-    const targetTile = player.getFacingTile();
-
-    // Only allow farming within farm plot boundaries
     if (!this.isFarmTile(targetTile.x, targetTile.y)) {
-      return;
+      return
     }
 
-    const world = NetworkManager.worldState;
-    if (!world) return;
+    const world = NetworkManager.worldState
+    if (!world) return
 
-    const tile = world.tiles[targetTile.y]?.[targetTile.x];
-    if (!tile) return;
+    const tile = world.tiles[targetTile.y]?.[targetTile.x]
+    if (!tile) return
+
+    const equipped = this.getSelectedItemId()
 
     // =====================================
-    // HOE (till)
+    // HOE (till) — default or explicit
     // =====================================
-
-    if (tile.type === 'farm') {
-
-      this.isActing = true;
-
-      player.play(`bunny-hoe-${player.lastDir}`);
+    if (
+      (equipped === 'item_hoe' || equipped === null) &&
+      tile.type === 'farm'
+    ) {
+      this.isActing = true
+      player.play(`bunny-hoe-${player.lastDir}`)
 
       player.once(
         Phaser.Animations.Events.ANIMATION_COMPLETE,
         () => {
-          player.play(
-            `bunny-idle-${player.lastDir}`
-          );
-          this.isActing = false;
+          player.play(`bunny-idle-${player.lastDir}`)
+          this.isActing = false
         }
-      );
+      )
 
       this.time.delayedCall(250, () => {
         NetworkManager.send({
           type: 'till',
           x: targetTile.x,
-          y: targetTile.y
-        });
-      });
+          y: targetTile.y,
+        })
+      })
 
-      return;
+      return
     }
 
     // =====================================
     // WATER
     // =====================================
-
-    if (tile.type === 'tilled' && !tile.watered) {
-
-      this.isActing = true;
-
-      player.play(`bunny-wateringcan-${player.lastDir}`);
+    if (equipped === 'item_watering_can' && tile.type === 'tilled' && !tile.watered) {
+      this.isActing = true
+      player.play(`bunny-wateringcan-${player.lastDir}`)
 
       player.once(
         Phaser.Animations.Events.ANIMATION_COMPLETE,
         () => {
-          player.play(
-            `bunny-idle-${player.lastDir}`
-          );
-          this.isActing = false;
+          player.play(`bunny-idle-${player.lastDir}`)
+          this.isActing = false
         }
-      );
+      )
 
       this.time.delayedCall(250, () => {
         NetworkManager.send({
           type: 'water',
           x: targetTile.x,
-          y: targetTile.y
-        });
-      });
+          y: targetTile.y,
+        })
+      })
 
-      return;
+      return
     }
 
     // =====================================
-    // PLANT
+    // PLANT (seed)
     // =====================================
-
     if (
+      equipped &&
+      equipped.includes('seed') &&
       tile.type === 'tilled' &&
       tile.watered &&
       !tile.crop
     ) {
-
-      this.isActing = true;
+      this.isActing = true
 
       NetworkManager.send({
         type: 'plant',
         x: targetTile.x,
-        y: targetTile.y
-      });
+        y: targetTile.y,
+        cropType: equipped, // send which seed was used
+      })
 
       this.time.delayedCall(200, () => {
-        this.isActing = false;
-      });
+        this.isActing = false
+      })
 
-      return;
+      return
     }
 
     // =====================================
-    // HARVEST
+    // HARVEST (no tool required)
     // =====================================
-
-    if (
-      tile.crop &&
-      tile.crop.growth >= tile.crop.maxGrowth
-    ) {
-
-      this.isActing = true;
+    if (tile.crop && tile.crop.growth >= tile.crop.maxGrowth) {
+      this.isActing = true
 
       NetworkManager.send({
         type: 'harvest',
         x: targetTile.x,
-        y: targetTile.y
-      });
+        y: targetTile.y,
+      })
 
       this.time.delayedCall(200, () => {
-        this.isActing = false;
-      });
+        this.isActing = false
+      })
     }
   }
 
   private renderWorldFromServer(world: any) {
     for (let y = 0; y < world.height; y++) {
       for (let x = 0; x < world.width; x++) {
-
-        const tile = world.tiles[y][x];
-
-        // =====================
-        // FARMING LAYER
-        // =====================
+        const tile = world.tiles[y][x]
 
         if (tile.type === 'tilled') {
-
-          this.detailLayer.removeTileAt(x, y);
-
+          this.detailLayer.removeTileAt(x, y)
           this.farmingLayer.putTileAt(
             tile.watered ? 158 : 157,
             x,
             y
-          );
-
+          )
         } else {
-
-          this.farmingLayer.removeTileAt(x, y);
-
+          this.farmingLayer.removeTileAt(x, y)
         }
 
-        // =====================
-        // CROPS
-        // =====================
-
         if (tile.crop) {
-
-          this.cropLayer.putTileAt(1, x, y);
-
+          this.cropLayer.putTileAt(1, x, y)
         } else {
-
-          this.cropLayer.removeTileAt(x, y);
-
+          this.cropLayer.removeTileAt(x, y)
         }
       }
     }
   }
-
-
 }

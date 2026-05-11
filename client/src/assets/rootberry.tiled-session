@@ -38,9 +38,17 @@
         "tiles/grass.tsx": {
             "scaleInDock": 1,
             "scaleInEditor": 2
+        },
+        "tiles/tools.tsx": {
+            "dynamicWrapping": true
         }
     },
-    "last.imagePath": "D:/rootberry/client/src/assets/bunny/HOE",
+    "last.imagePath": "C:/Users/rey/Downloads",
+    "map.height": 10,
+    "map.lastUsedFormat": "tmx",
+    "map.tileHeight": 16,
+    "map.tileWidth": 16,
+    "map.width": 20,
     "openFiles": [
     ],
     "project": "rootberry.tiled-project",
@@ -58,5 +66,6 @@
     "tileset.tileSize": {
         "height": 16,
         "width": 16
-    }
+    },
+    "tileset.type": 1
 }
