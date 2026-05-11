@@ -20,7 +20,14 @@ export default class AssetManager {
     this.scene.load.image('nature', '/src/assets/tiles/Nature_Tileset.png')
     this.scene.load.image('exterior', '/src/assets/tiles/Exterior_Tileset.png')
     this.scene.load.image('house', '/src/assets/tiles/House_Tileset.png')
-    this.scene.load.image('tools', '/src/assets/tiles/Tools_Tileset.png')
+    this.scene.load.spritesheet(
+      'tools',
+      '/src/assets/tiles/Tools_Tileset.png',
+      {
+        frameWidth: 16,
+        frameHeight: 16,
+      }
+    )
     this.scene.load.image(
       'floor_details',
       '/src/assets/tiles/Tileset_Floor_Detail.png'
