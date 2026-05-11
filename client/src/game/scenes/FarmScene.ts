@@ -681,12 +681,15 @@ export default class FarmScene extends Phaser.Scene {
     const targetPxX = nextX * TILE * SCALE;
     const targetPxY = nextY * TILE * SCALE;
 
+    const isRunning = this.controls.RUN.isDown;
+    const duration = isRunning ? 80 : 200;
+
     // Move instantly on screen
     this.tweens.add({
       targets: sprite,
       x: targetPxX,
       y: targetPxY,
-      duration: 120, // Duration of the walk animation
+      duration: duration,
       ease: 'Linear',
       onStart: () => sprite.updateDirection(direction, true),
       onComplete: () => {
