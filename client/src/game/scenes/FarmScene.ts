@@ -20,17 +20,31 @@ export default class FarmScene extends Phaser.Scene {
   private worldConfig: any;
   players: Map<string, Player> = new Map();
   private isMoving = false;
+  private isActing = false;
   private controls!: Record<keyof typeof KEY_CONFIG, Phaser.Input.Keyboard.Key>;
 
   private farmingLayer!: Phaser.Tilemaps.TilemapLayer;
   private cropLayer!: Phaser.Tilemaps.TilemapLayer;
+  private detailLayer!: Phaser.Tilemaps.TilemapLayer;
+  private obstacleLayer!: Phaser.Tilemaps.TilemapLayer;
+  private treeLayer!: Phaser.Tilemaps.TilemapLayer;
+  private houseLayer!: Phaser.Tilemaps.TilemapLayer;
+  private groundLayer!: Phaser.Tilemaps.TilemapLayer;
+  private backgroundLayer!: Phaser.Tilemaps.TilemapLayer;
+
 
   private lastSentPos = { x: -1, y: -1 };
   private lastWorldHash = '';
 
-  // Tile GID constants
-  private FARM_TILE!: { farm: number; dry: number; watered: number };
-  private CROP_TILE!: { carrot: number };
+  // Farm plot boundaries
+  private farmPlot!: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+
+  private farmTiles = new Set<string>();
 
   constructor() {
     super('FarmScene');
@@ -75,26 +89,15 @@ export default class FarmScene extends Phaser.Scene {
       return;
     }
 
-    // Tile GID constants (must be computed after tilesets are loaded)
-    this.FARM_TILE = {
-      farm: grassTileset.firstgid + 174,
-      dry: 157,
-      watered: 158
-    };
-
-    this.CROP_TILE = {
-      carrot: cropTileset.firstgid + 1
-    };
-
     // --- B. LAYER SETUP ---
     // LAYER 1: BASE (Solid Grass & Dirt Paths) - Depth 0
-    const groundLayer = map.createBlankLayer('Ground', grassTileset)!.setScale(SCALE).setDepth(0);
+    this.groundLayer = map.createBlankLayer('Ground', grassTileset)!.setScale(SCALE).setDepth(0);
 
     // LAYER 2: FARMING (Tilled Plots & Wet Soil) - Depth 1, 2 (Separate layer for crops to appear above tilled soil)
     this.farmingLayer = map.createBlankLayer('Farming', cropTileset)!.setScale(SCALE).setDepth(1);
     this.cropLayer = map.createBlankLayer('Crops', cropTileset)!.setScale(SCALE).setDepth(2);
 
-    const backgroundLayer = map.createBlankLayer(
+    this.backgroundLayer = map.createBlankLayer(
       'BackgroundDecor',
       [natureTileset, exteriorTileset]
     )!
@@ -102,28 +105,28 @@ export default class FarmScene extends Phaser.Scene {
       .setDepth(2.5);
 
     // LAYER 3: OBSTACLES (Fences, House Base, Bottom of Trees) - Depth 3
-    const obstacleLayer = map.createBlankLayer(
+    this.obstacleLayer = map.createBlankLayer(
       'Obstacles',
       [exteriorTileset, houseTileset] // multiple tilesets
     )!
       .setScale(SCALE)
       .setDepth(3);
 
-    const treeLayer = map.createBlankLayer(
+    this.treeLayer = map.createBlankLayer(
       'Trees',
       [natureTileset]
     )!
       .setScale(SCALE)
       .setDepth(3.1);
 
-    const houseLayer = map.createBlankLayer(
+    this.houseLayer = map.createBlankLayer(
       'House',
       [houseTileset]
     )!
       .setScale(SCALE)
       .setDepth(3.2);
 
-    const detailLayer = map.createBlankLayer('Details', [houseTileset, floorDetailsTileset])!
+    this.detailLayer = map.createBlankLayer('Details', [houseTileset, floorDetailsTileset])!
       .setScale(SCALE)
       .setDepth(3.3); // For things like windows that should be above obstacles but below players
 
@@ -134,7 +137,7 @@ export default class FarmScene extends Phaser.Scene {
     // [cite: LAYER 4: ENTITIES] (Player sprite, Cow, Chicken) - Depth 4 (Set in entity class)
 
     // LAYER 5: OVERHEAD (Roofs, Top of Trees) - Depth 5
-    const overheadLayer = map.createBlankLayer('Overhead', natureTileset)!.setScale(SCALE).setDepth(5);
+
 
     // Helpers
     const NAT = (i: number) => natureTileset.firstgid + i;
@@ -145,6 +148,12 @@ export default class FarmScene extends Phaser.Scene {
     const details = {
       flower1: FLOOR(13),
       flower2: FLOOR(24),
+      tillableDirt: FLOOR(37),
+
+      grassTileSet: {
+        grass: 73,
+      },
+
       grassGroupL: [
         [FLOOR(17), FLOOR(18)],
         [FLOOR(28), FLOOR(29)]
@@ -167,8 +176,8 @@ export default class FarmScene extends Phaser.Scene {
     // --- E. GENERATE WORLD ( procedural) ---
     // =========================================
 
-    // Fill the entire world with Ground (Index 58)
-    groundLayer.fill(73);
+    // Fill the entire world with grass
+    this.groundLayer.fill(details.grassTileSet.grass);
 
     // draw fence
     const fenceTile = {
@@ -183,20 +192,20 @@ export default class FarmScene extends Phaser.Scene {
       horizontalBrokendown: EXT(83)
     };
 
-    obstacleLayer.putTileAt(fenceTile.topLeftCorner, 0, 0);
-    // obstacleLayer.putTileAt(fenceTile.topRightCorner, MAP_SIZE_X - 1, 0);
+    this.obstacleLayer.putTileAt(fenceTile.topLeftCorner, 0, 0);
+    // this.obstacleLayer.putTileAt(fenceTile.topRightCorner, MAP_SIZE_X - 1, 0);
 
     for (let x = 1; x < MAP_SIZE_X; x++) {
-      obstacleLayer.putTileAt(fenceTile.horizontal, x, 0);
-      // obstacleLayer.putTileAt(fenceTile.horizontal, x, MAP_SIZE_Y - 1);
+      this.obstacleLayer.putTileAt(fenceTile.horizontal, x, 0);
+      // this.obstacleLayer.putTileAt(fenceTile.horizontal, x, MAP_SIZE_Y - 1);
     }
 
-    // obstacleLayer.putTileAt(fenceTile.bottomLeftCorner, 0, MAP_SIZE_Y - 1);
-    // obstacleLayer.putTileAt(fenceTile.bottomRightCorner, MAP_SIZE_X - 1, MAP_SIZE_Y - 1);
+    // this.obstacleLayer.putTileAt(fenceTile.bottomLeftCorner, 0, MAP_SIZE_Y - 1);
+    // this.obstacleLayer.putTileAt(fenceTile.bottomRightCorner, MAP_SIZE_X - 1, MAP_SIZE_Y - 1);
 
     for (let y = 1; y < MAP_SIZE_Y; y++) {
-      obstacleLayer.putTileAt(fenceTile.verticalLeft, 0, y);
-      // obstacleLayer.putTileAt(fenceTile.verticalRight, MAP_SIZE_X - 1, y);
+      this.obstacleLayer.putTileAt(fenceTile.verticalLeft, 0, y);
+      // this.obstacleLayer.putTileAt(fenceTile.verticalRight, MAP_SIZE_X - 1, y);
     }
 
     // THE HOUSE (Top Center-Left)
@@ -211,11 +220,11 @@ export default class FarmScene extends Phaser.Scene {
       [115, 209, 111, 209, 116]
     ].map(row => row.map(HOUSE));
 
-    houseLayer.putTilesAt(roofTiles, houseX, houseY - 2);
-    detailLayer.putTileAt(HOUSE(68), houseX + 2, houseY + 1);    // top window
-    detailLayer.putTileAt(HOUSE(377), houseX + 2, houseY + 2);   // main door shed
-    detailLayer.putTileAt(HOUSE(182), houseX + 1, houseY + 2);   // left window
-    detailLayer.putTileAt(HOUSE(182), houseX + 3, houseY + 2);   // right window
+    this.houseLayer.putTilesAt(roofTiles, houseX, houseY - 2);
+    this.detailLayer.putTileAt(HOUSE(68), houseX + 2, houseY + 1);    // top window
+    this.detailLayer.putTileAt(HOUSE(377), houseX + 2, houseY + 2);   // main door shed
+    this.detailLayer.putTileAt(HOUSE(182), houseX + 1, houseY + 2);   // left window
+    this.detailLayer.putTileAt(HOUSE(182), houseX + 3, houseY + 2);   // right window
 
     // trees
     const treeTiles = {
@@ -242,15 +251,15 @@ export default class FarmScene extends Phaser.Scene {
       [160, 161],
     ].map(row => row.map(EXT))
 
-    treeLayer.putTilesAt(treeTiles.pineGroup, 0, 0);
-    treeLayer.putTilesAt(treeTiles.pineSingle, 7, 0);
-    backgroundLayer.putTilesAt(wellTiles, 8, 2);
+    this.treeLayer.putTilesAt(treeTiles.pineGroup, 0, 0);
+    this.treeLayer.putTilesAt(treeTiles.pineSingle, 7, 0);
+    this.backgroundLayer.putTilesAt(wellTiles, 8, 2);
 
-    backgroundLayer.putTileAt(NAT(153), 1, 3);
-    backgroundLayer.putTileAt(NAT(39), 1, 4);
-    backgroundLayer.putTileAt(EXT(70), 2, 3);
+    this.backgroundLayer.putTileAt(NAT(153), 1, 3);
+    this.backgroundLayer.putTileAt(NAT(39), 1, 4);
+    this.backgroundLayer.putTileAt(EXT(70), 2, 3);
 
-    treeLayer.putTilesAt(treeTiles.bigTree, 1, 4);
+    this.treeLayer.putTilesAt(treeTiles.bigTree, 1, 4);
 
 
     // Draw the "z-Shaped" Path
@@ -270,86 +279,97 @@ export default class FarmScene extends Phaser.Scene {
     };
 
 
-    groundLayer.putTileAt(57, 5, 4);
-    groundLayer.putTileAt(78, 5, 5);
-    groundLayer.putTileAt(60, 6, 4);
+    this.groundLayer.putTileAt(57, 5, 4);
+    this.groundLayer.putTileAt(78, 5, 5);
+    this.groundLayer.putTileAt(60, 6, 4);
     // Horizontal path from house to right
     let x;
     for (x = 7; x < 18; x++) {
-      groundLayer.putTileAt(groundTiles.top, x, 4);
-      groundLayer.putTileAt(groundTiles.bottom, x - 1, 5);
+      this.groundLayer.putTileAt(groundTiles.top, x, 4);
+      this.groundLayer.putTileAt(groundTiles.bottom, x - 1, 5);
     }
 
-    groundLayer.putTileAt(groundTiles.topRightCorner, x, 4);
-    groundLayer.putTileAt(groundTiles.right, x, 5);
-    groundLayer.putTileAt(groundTiles.bottomLeftEdge, --x, 5);
+    this.groundLayer.putTileAt(groundTiles.topRightCorner, x, 4);
+    this.groundLayer.putTileAt(groundTiles.right, x, 5);
+    this.groundLayer.putTileAt(groundTiles.bottomLeftEdge, --x, 5);
 
     // Vertical path down the right side
     let y;
     for (y = 6; y < 20; y++) {
-      groundLayer.putTileAt(groundTiles.left, x, y);
-      groundLayer.putTileAt(groundTiles.right, x + 1, y);
+      this.groundLayer.putTileAt(groundTiles.left, x, y);
+      this.groundLayer.putTileAt(groundTiles.right, x + 1, y);
     }
 
-    groundLayer.putTileAt(groundTiles.left, x, y++);
-    groundLayer.putTileAt(groundTiles.bottomLeftCorner, x++, y);
-    groundLayer.putTileAt(groundTiles.topRightEdge, x, y - 1);
+    this.groundLayer.putTileAt(groundTiles.left, x, y++);
+    this.groundLayer.putTileAt(groundTiles.bottomLeftCorner, x++, y);
+    this.groundLayer.putTileAt(groundTiles.topRightEdge, x, y - 1);
 
     // Horizontal path back left at the bottom
     for (; x < 40; x++) {
-      groundLayer.putTileAt(groundTiles.top, x + 1, y - 1);
-      groundLayer.putTileAt(groundTiles.bottom, x, y);
+      this.groundLayer.putTileAt(groundTiles.top, x + 1, y - 1);
+      this.groundLayer.putTileAt(groundTiles.bottom, x, y);
     }
 
     // =========================================
     // Farming Area (Center)
     // =========================================
-    const dirtTile = 58;
-    const farmPlot = {
-      x: 2,
+    const DIRT = 58;
+    this.farmPlot = {
+      x: 4,
       y: 9,
-      width: 11,
+      width: 9,
       height: 7
     };
 
-    const startX = farmPlot.x;
-    const startY = farmPlot.y;
+    const startX = this.farmPlot.x;
+    const startY = this.farmPlot.y;
 
-    const endX = startX + farmPlot.width - 1;
-    const endY = startY + farmPlot.height - 1;
+    const endX = startX + this.farmPlot.width - 1;
+    const endY = startY + this.farmPlot.height - 1;
 
     // =========================================
-    // Fill Dirt (background)
+    // Open farmland area (ground only)
     // =========================================
 
     for (let y = startY; y <= endY; y++) {
       for (let x = startX; x <= endX; x++) {
-        groundLayer.putTileAt(dirtTile, x, y);
+        const isFarmSpot = (x - startX) % 2 === 0 && (y - startY) % 2 === 0;
+        if (isFarmSpot) {
+          this.detailLayer.putTileAt(details.tillableDirt, x, y);
+        }
+        this.groundLayer.putTileAt(DIRT, x, y);
+        // groundLayer.putTileAt(isFarmSpot ? DIRT_DARK : DIRT, x, y);
+        if (isFarmSpot) {
+          this.farmTiles.add(`${x},${y}`);
+        }
       }
     }
 
     // =========================================
-    // Place Farm Soil Tiles (with gaps)
+    // Farm Plot Boundaries (no tiles - empty)
     // =========================================
+    // farmingLayer stays empty; tilled soil renders only when server sends state
 
-    for (let y = startY; y <= endY; y += 2) {
-      for (let x = startX; x <= endX; x += 2) {
-        this.farmingLayer.putTileAt(this.FARM_TILE.dry, x, y);
-      }
-    }
+    // Store farm bounds for validation
+    this.farmPlot = {
+      x: startX,
+      y: startY,
+      width: this.farmPlot.width,
+      height: this.farmPlot.height
+    };
 
     // =========================================
     // Ground Border Top + Bottom
     // =========================================
 
     for (let x = startX; x <= endX; x++) {
-      groundLayer.putTileAt(
+      this.groundLayer.putTileAt(
         groundTiles.top,
         x,
         startY - 1
       );
 
-      groundLayer.putTileAt(
+      this.groundLayer.putTileAt(
         groundTiles.bottom,
         x,
         endY + 1
@@ -361,13 +381,13 @@ export default class FarmScene extends Phaser.Scene {
     // =========================================
 
     for (let y = startY; y <= endY; y++) {
-      groundLayer.putTileAt(
+      this.groundLayer.putTileAt(
         groundTiles.left,
         startX - 1,
         y
       );
 
-      groundLayer.putTileAt(
+      this.groundLayer.putTileAt(
         groundTiles.right,
         endX + 1,
         y
@@ -378,25 +398,25 @@ export default class FarmScene extends Phaser.Scene {
     // Corners
     // =========================================
 
-    groundLayer.putTileAt(
+    this.groundLayer.putTileAt(
       groundTiles.topLeftCorner,
       startX - 1,
       startY - 1
     );
 
-    groundLayer.putTileAt(
+    this.groundLayer.putTileAt(
       groundTiles.topRightCorner,
       endX + 1,
       startY - 1
     );
 
-    groundLayer.putTileAt(
+    this.groundLayer.putTileAt(
       groundTiles.bottomLeftCorner,
       startX - 1,
       endY + 1
     );
 
-    groundLayer.putTileAt(
+    this.groundLayer.putTileAt(
       groundTiles.bottomRightCorner,
       endX + 1,
       endY + 1
@@ -405,7 +425,7 @@ export default class FarmScene extends Phaser.Scene {
     // Top Fence
 
     for (let x = startX - 1; x <= endX + 1; x++) {
-      obstacleLayer.putTileAt(
+      this.obstacleLayer.putTileAt(
         fenceTile.horizontalBrokenUp,
         x,
         startY - 2
@@ -415,7 +435,7 @@ export default class FarmScene extends Phaser.Scene {
     // Bottom Fence
 
     for (let x = startX - 1; x <= endX + 1; x++) {
-      obstacleLayer.putTileAt(
+      this.obstacleLayer.putTileAt(
         fenceTile.horizontalBrokenUp,
         x,
         endY + 2
@@ -449,27 +469,31 @@ export default class FarmScene extends Phaser.Scene {
       [233, 234, 234, 235]
     ].map(row => row.map(EXT));
 
-    groundLayer.putTilesAt(pondTiles, 1, MAP_SIZE_Y - 3);
-    backgroundLayer.putTilesAt(bridgeTiles, pondTiles[0].length - 3, MAP_SIZE_Y - 2);
-    backgroundLayer.putTileAt(pondEco.bubbles, 4, MAP_SIZE_Y - 2);
-    backgroundLayer.putTileAt(pondEco.lilyPad, 2, MAP_SIZE_Y - 1);
-    backgroundLayer.putTileAt(pondEco.lotus, 3, MAP_SIZE_Y - 1);
-    backgroundLayer.putTilesAt(
+    this.groundLayer.putTilesAt(pondTiles, 1, MAP_SIZE_Y - 3);
+    this.backgroundLayer.putTilesAt(bridgeTiles, pondTiles[0].length - 3, MAP_SIZE_Y - 2);
+    this.backgroundLayer.putTileAt(pondEco.bubbles, 4, MAP_SIZE_Y - 2);
+    this.backgroundLayer.putTileAt(pondEco.lilyPad, 2, MAP_SIZE_Y - 1);
+    this.backgroundLayer.putTileAt(pondEco.lotus, 3, MAP_SIZE_Y - 1);
+    this.backgroundLayer.putTilesAt(
       pondEco.waterStoneWithMossXL,
       2,
       MAP_SIZE_Y - 3
     );
-    backgroundLayer.putTileAt(pondEco.lotus, 8, MAP_SIZE_Y - 2);
-    backgroundLayer.putTileAt(pondEco.waterBamboo, 10, MAP_SIZE_Y - 2);
+    this.backgroundLayer.putTileAt(pondEco.lotus, 8, MAP_SIZE_Y - 2);
+    this.backgroundLayer.putTileAt(pondEco.waterBamboo, 10, MAP_SIZE_Y - 2);
 
-    treeLayer.putTilesAt(treeTiles.pineSingle, 14, MAP_SIZE_Y - 6);
-    detailLayer.putTileAt(details.flower2, 14, MAP_SIZE_Y - 3);
+    this.treeLayer.putTilesAt(treeTiles.pineSingle, 14, MAP_SIZE_Y - 6);
+    this.treeLayer.putTilesAt(treeTiles.pineSingle, 1, MAP_SIZE_Y - 6);
 
-    detailLayer.putTilesAt(details.grassGroupS, 15, MAP_SIZE_Y - 2);
+    this.detailLayer.putTileAt(details.flower2, 14, MAP_SIZE_Y - 3);
 
-    obstacleLayer.putTilesAt(details.lampPost, 15, MAP_SIZE_Y - 4);
+    this.detailLayer.putTilesAt(details.grassGroupS, 15, MAP_SIZE_Y - 2);
 
-    obstacleLayer.putTilesAt(details.noticeBoard, 19, MAP_SIZE_Y - 4);
+    this.obstacleLayer.putTilesAt(details.lampPost, 15, MAP_SIZE_Y - 4);
+
+    this.obstacleLayer.putTilesAt(details.noticeBoard, 19, MAP_SIZE_Y - 4);
+
+    this.obstacleLayer.putTilesAt(details.noticeBoard, 19, MAP_SIZE_Y - 4);
 
 
     // --- G. FINALIZE SETUP ---
@@ -601,7 +625,13 @@ export default class FarmScene extends Phaser.Scene {
     const playerId = NetworkManager.playerId;
 
     // Ensure we have world data, our ID, and aren't mid-animation
-    if (!world || !world.players || !playerId || this.isMoving) return;
+    if (
+      !world ||
+      !world.players ||
+      !playerId ||
+      this.isMoving ||
+      this.isActing
+    ) return;
 
     const me = world.players[playerId];
     const mySprite = this.players.get(playerId);
@@ -671,8 +701,18 @@ export default class FarmScene extends Phaser.Scene {
     NetworkManager.send({ type: 'move', x: nextX, y: nextY });
   }
 
+  private isFarmTile(x: number, y: number): boolean {
+    return this.farmTiles.has(`${x},${y}`);
+  }
+
   private handleAction(player: Player) {
+
     const targetTile = player.getFacingTile();
+
+    // Only allow farming within farm plot boundaries
+    if (!this.isFarmTile(targetTile.x, targetTile.y)) {
+      return;
+    }
 
     const world = NetworkManager.worldState;
     if (!world) return;
@@ -681,16 +721,26 @@ export default class FarmScene extends Phaser.Scene {
     if (!tile) return;
 
     // =====================================
-    // TILL
+    // HOE (till)
     // =====================================
 
-    if (
-      tile.type === 'grass' ||
-      tile.type === 'farm'
-    ) {
+    if (tile.type === 'farm') {
+
+      this.isActing = true;
+
       player.play(`bunny-hoe-${player.lastDir}`);
 
-      this.time.delayedCall(200, () => {
+      player.once(
+        Phaser.Animations.Events.ANIMATION_COMPLETE,
+        () => {
+          player.play(
+            `bunny-idle-${player.lastDir}`
+          );
+          this.isActing = false;
+        }
+      );
+
+      this.time.delayedCall(250, () => {
         NetworkManager.send({
           type: 'till',
           x: targetTile.x,
@@ -706,9 +756,22 @@ export default class FarmScene extends Phaser.Scene {
     // =====================================
 
     if (tile.type === 'tilled' && !tile.watered) {
+
+      this.isActing = true;
+
       player.play(`bunny-wateringcan-${player.lastDir}`);
 
-      this.time.delayedCall(200, () => {
+      player.once(
+        Phaser.Animations.Events.ANIMATION_COMPLETE,
+        () => {
+          player.play(
+            `bunny-idle-${player.lastDir}`
+          );
+          this.isActing = false;
+        }
+      );
+
+      this.time.delayedCall(250, () => {
         NetworkManager.send({
           type: 'water',
           x: targetTile.x,
@@ -728,14 +791,17 @@ export default class FarmScene extends Phaser.Scene {
       tile.watered &&
       !tile.crop
     ) {
-      player.play(`bunny-wateringcan-${player.lastDir}`);
+
+      this.isActing = true;
+
+      NetworkManager.send({
+        type: 'plant',
+        x: targetTile.x,
+        y: targetTile.y
+      });
 
       this.time.delayedCall(200, () => {
-        NetworkManager.send({
-          type: 'plant',
-          x: targetTile.x,
-          y: targetTile.y
-        });
+        this.isActing = false;
       });
 
       return;
@@ -745,11 +811,21 @@ export default class FarmScene extends Phaser.Scene {
     // HARVEST
     // =====================================
 
-    if (tile.crop && tile.crop.growth >= tile.crop.maxGrowth) {
+    if (
+      tile.crop &&
+      tile.crop.growth >= tile.crop.maxGrowth
+    ) {
+
+      this.isActing = true;
+
       NetworkManager.send({
         type: 'harvest',
         x: targetTile.x,
         y: targetTile.y
+      });
+
+      this.time.delayedCall(200, () => {
+        this.isActing = false;
       });
     }
   }
@@ -757,37 +833,45 @@ export default class FarmScene extends Phaser.Scene {
   private renderWorldFromServer(world: any) {
     for (let y = 0; y < world.height; y++) {
       for (let x = 0; x < world.width; x++) {
+
         const tile = world.tiles[y][x];
 
-        // =========================
+        // =====================
         // FARMING LAYER
-        // =========================
+        // =====================
 
-        if (tile.type === 'farm') {
-          this.farmingLayer.putTileAt(this.FARM_TILE.dry, x, y);
-        }
-        else if (tile.type === 'tilled') {
+        if (tile.type === 'tilled') {
 
-          const tileId = tile.watered
-            ? this.FARM_TILE.watered
-            : this.FARM_TILE.dry;
+          this.detailLayer.removeTileAt(x, y);
 
-          this.farmingLayer.putTileAt(tileId, x, y);
-        }
-        else {
+          this.farmingLayer.putTileAt(
+            tile.watered ? 158 : 157,
+            x,
+            y
+          );
+
+        } else {
+
           this.farmingLayer.removeTileAt(x, y);
+
         }
 
-        // =========================
+        // =====================
         // CROPS
-        // =========================
+        // =====================
 
         if (tile.crop) {
-          this.cropLayer.putTileAt(this.CROP_TILE.carrot, x, y);
+
+          this.cropLayer.putTileAt(1, x, y);
+
         } else {
+
           this.cropLayer.removeTileAt(x, y);
+
         }
       }
     }
   }
+
+
 }

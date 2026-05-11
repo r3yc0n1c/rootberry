@@ -108,8 +108,8 @@ func handleAction(room *game.Room, p *game.Player, m Message) {
 
 		tile := room.World.Tiles[m.Y][m.X]
 
-		// only grass or farm tiles can be tilled
-		if tile.Type == "grass" || tile.Type == "farm" {
+		// only farm tiles can be tilled
+		if tile.Type == "farm" {
 			tile.Type = "tilled"
 			tile.Watered = false
 		}
@@ -163,8 +163,8 @@ func handleAction(room *game.Room, p *game.Player, m Message) {
 			p.Money += 10
 
 			tile.Crop = nil
-			tile.Type = "farm"
 			tile.Watered = false
+			tile.Type = "tilled"
 		}
 
 		p.State = "idle"

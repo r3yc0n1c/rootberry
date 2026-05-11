@@ -21,15 +21,15 @@ export default class AssetManager {
     this.scene.load.image('exterior', '/src/assets/tiles/Exterior_Tileset.png')
     this.scene.load.image('house', '/src/assets/tiles/House_Tileset.png')
     this.scene.load.image(
-      'floor_details', 
+      'floor_details',
       '/src/assets/tiles/Tileset_Floor_Detail.png'
     )
 
     this.scene.load.spritesheet(
       'crops',
-      '/src/assets/crops/Crops_Tileset.png', 
+      '/src/assets/crops/Crops_Tileset.png',
       {
-        frameWidth: 16, 
+        frameWidth: 16,
         frameHeight: 16
       }
     )
@@ -54,6 +54,28 @@ export default class AssetManager {
       }
     ).on('fileerror', (file: any) => {
       console.error('Failed to load bunny_run spritesheet:', file)
+    })
+
+    this.scene.load.spritesheet(
+      'bunny_hoe',
+      '/src/assets/bunny/HOE/Bunny_Hoe.png',
+      {
+        frameWidth: 48,
+        frameHeight: 48,
+      }
+    ).on('fileerror', (file: any) => {
+      console.error('Failed to load bunny_hoe spritesheet:', file)
+    })
+
+    this.scene.load.spritesheet(
+      'bunny_wateringcan',
+      '/src/assets/bunny/WATERING CAN/Bunny_WateringCan.png',
+      {
+        frameWidth: 48,
+        frameHeight: 48,
+      }
+    ).on('fileerror', (file: any) => {
+      console.error('Failed to load bunny_wateringcan spritesheet:', file)
     })
 
     // Error handling
@@ -111,6 +133,36 @@ export default class AssetManager {
           frames: anims.generateFrameNumbers('bunny_run', { start: runStartFrame, end: runEndFrame }),
           frameRate: 12,
           repeat: -1
+        });
+      }
+
+      // Hoe animations
+      const hoeFramesPerAnim = 9;
+      const hoeStartFrame = index * hoeFramesPerAnim;
+      const hoeEndFrame = hoeStartFrame + (hoeFramesPerAnim - 1);
+      const hoeKey = `bunny-hoe-${dir}`;
+
+      if (!anims.exists(hoeKey)) {
+        anims.create({
+          key: hoeKey,
+          frames: anims.generateFrameNumbers('bunny_hoe', { start: hoeStartFrame, end: hoeEndFrame }),
+          frameRate: 12,
+          repeat: 0
+        });
+      }
+
+      // Watering can animations
+      const waterFramesPerAnim = 8;
+      const waterStartFrame = index * waterFramesPerAnim;
+      const waterEndFrame = waterStartFrame + (waterFramesPerAnim - 1);
+      const waterKey = `bunny-wateringcan-${dir}`;
+
+      if (!anims.exists(waterKey)) {
+        anims.create({
+          key: waterKey,
+          frames: anims.generateFrameNumbers('bunny_wateringcan', { start: waterStartFrame, end: waterEndFrame }),
+          frameRate: 12,
+          repeat: 0
         });
       }
     });

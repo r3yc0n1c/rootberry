@@ -49,7 +49,6 @@ export default class Player extends Phaser.GameObjects.Sprite {
     }
   }
 
-  // Player.ts
   getFacingTile() {
     // Convert current pixel position to tile coordinates
     let tx = Math.floor(this.x / (16 * 2)); // TILE * SCALE
