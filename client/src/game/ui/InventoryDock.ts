@@ -1,16 +1,10 @@
 import Phaser from 'phaser'
 import InventoryManager from '../managers/InventoryManager'
-import Item from '../entities/Item'
 
 const ITEM_SLOT_SIZE = 52
 const MAX_DISPLAY_ITEMS = 6
 const DOCK_PADDING = 10
 
-// Fallback colours for items without a spritesheet frame
-const ITEM_COLOURS: Record<string, number> = {
-  item_carrot_seed: 0xe07c24,
-}
-const DEFAULT_ITEM_COLOUR = 0x555555
 
 export default class InventoryDock extends Phaser.GameObjects.Container {
   private inventoryManager: InventoryManager
@@ -18,8 +12,6 @@ export default class InventoryDock extends Phaser.GameObjects.Container {
   // Per-slot children (indexed by slot index)
   private itemSlots: Phaser.GameObjects.Graphics[] = []
   private itemSprites: Phaser.GameObjects.Sprite[] = []
-  private seedIcons: Phaser.GameObjects.Graphics[] = []
-  private keyLabels: Phaser.GameObjects.Text[] = []
 
   // label at bottom of dock
   private equippedLabel!: Phaser.GameObjects.Text
@@ -46,9 +38,7 @@ export default class InventoryDock extends Phaser.GameObjects.Container {
   private buildDock() {
     const { width, height } = this.scene.scale
 
-    const inventory = this.inventoryManager.getInventory()
-    const slotCount = Math.min(inventory.length, MAX_DISPLAY_ITEMS)
-    const dockWidth = slotCount * ITEM_SLOT_SIZE + DOCK_PADDING * 2
+    const dockWidth = MAX_DISPLAY_ITEMS * ITEM_SLOT_SIZE + DOCK_PADDING * 2
     const dockHeight = ITEM_SLOT_SIZE + DOCK_PADDING * 2 + 24
 
     const dockX = (width - dockWidth) / 2
@@ -58,8 +48,8 @@ export default class InventoryDock extends Phaser.GameObjects.Container {
 
     // --- Background panel ---
     const bg = this.scene.add.graphics()
-    bg.fillStyle(0x000000, 0.75)
-    bg.fillRect(0, 0, dockWidth, dockHeight)
+    bg.fillStyle(0x013220, 0.75)
+    bg.fillRoundedRect(0, 0, dockWidth, dockHeight, 8)
     this.add(bg)
 
     // --- Equipped label ---
@@ -76,7 +66,7 @@ export default class InventoryDock extends Phaser.GameObjects.Container {
     this.add(this.equippedLabel)
 
     // --- Slots ---
-    for (let i = 0; i < slotCount; i++) {
+    for (let i = 0; i < MAX_DISPLAY_ITEMS; i++) {
       const slotX = i * ITEM_SLOT_SIZE + DOCK_PADDING
       const slotY = DOCK_PADDING
       const cx = slotX + ITEM_SLOT_SIZE / 2
@@ -95,26 +85,6 @@ export default class InventoryDock extends Phaser.GameObjects.Container {
       sprite.setVisible(false)
       this.add(sprite)
       this.itemSprites.push(sprite)
-
-      // 3. Seed overlay graphics (rendered between sprite and border)
-      const seedGfx = this.scene.add.graphics()
-      this.add(seedGfx)
-      this.seedIcons.push(seedGfx)
-
-      // 4. Key label (1-indexed) above the slot
-      const keyLabel = this.scene.add.text(
-        cx,
-        slotY - 14,
-        `${i + 1}`,
-        {
-          fontSize: '11px',
-          color: '#999999',
-          fontFamily: 'monospace',
-        }
-      )
-      keyLabel.setOrigin(0.5, 0)
-      this.add(keyLabel)
-      this.keyLabels.push(keyLabel)
     }
   }
 
@@ -150,27 +120,19 @@ export default class InventoryDock extends Phaser.GameObjects.Container {
       }
 
       const sprite = this.itemSprites[index]
-      const seedGfx = this.seedIcons[index]
 
       // Hide all by default
       if (sprite) sprite.setVisible(false)
-      if (seedGfx) seedGfx.clear()
 
       if (!item) return
 
-      if (item.id === 'item_hoe') {
-        // Frame 0 = hoe in the tools tileset
-        if (sprite) {
-          sprite.setFrame(0).setVisible(true)
-        }
-      } else if (item.id === 'item_watering_can') {
-        // Frame 1 = watering can in the tools tileset
-        if (sprite) {
-          sprite.setFrame(1).setVisible(true)
-        }
-      } else if (item.id.includes('seed')) {
-        // Draw seed icon with Graphics since no texture exists
-        this.drawSeedIcon(seedGfx, index)
+      const isTool = item.id.startsWith('item_') && !item.id.includes('seed')
+      const isSeed = item.id.includes('seed')
+
+      if (isTool) {
+        sprite.setTexture(item.spriteConfig.texture).setFrame(item.spriteConfig.frame).setVisible(true)
+      } else if (isSeed) {
+        sprite.setTexture(item.spriteConfig.texture).setFrame(item.spriteConfig.frame).setVisible(true)
       }
     })
 
@@ -181,25 +143,7 @@ export default class InventoryDock extends Phaser.GameObjects.Container {
     }
   }
 
-  private drawSeedIcon(graphics: Phaser.GameObjects.Graphics, index: number) {
-    const slotX = index * ITEM_SLOT_SIZE + DOCK_PADDING
-    const slotY = DOCK_PADDING
-    const cx = slotX + ITEM_SLOT_SIZE / 2
-    const cy = slotY + ITEM_SLOT_SIZE / 2
-
-    graphics.clear()
-    graphics.fillStyle(0xe07c24, 1)
-    graphics.fillCircle(cx - 4, cy - 2, 4)
-    graphics.fillCircle(cx + 4, cy - 2, 4)
-    graphics.fillCircle(cx, cy + 4, 4)
-    graphics.lineStyle(2, 0x4caf50, 1)
-    graphics.beginPath()
-    graphics.moveTo(cx, cy + 4)
-    graphics.lineTo(cx, cy - 8)
-    graphics.strokePath()
-  }
-
-/** Called when the player selects a slot via hotkey */
+  /** Called when the player selects a slot via hotkey */
   private onItemSelected(selectedIndex: number) {
     // refreshInventoryUI re-draws all slot borders with the correct selection state
     this.refreshInventoryUI()
