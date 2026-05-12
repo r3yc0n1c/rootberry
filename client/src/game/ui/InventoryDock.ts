@@ -12,6 +12,7 @@ export default class InventoryDock extends Phaser.GameObjects.Container {
   // Per-slot children (indexed by slot index)
   private itemSlots: Phaser.GameObjects.Graphics[] = []
   private itemSprites: Phaser.GameObjects.Sprite[] = []
+  private quantityLabels: Phaser.GameObjects.Text[] = []
 
   // label at bottom of dock
   private equippedLabel!: Phaser.GameObjects.Text
@@ -64,6 +65,20 @@ export default class InventoryDock extends Phaser.GameObjects.Container {
       }
     )
     this.add(this.equippedLabel)
+
+    // --- Quantity labels (for stack count display) ---
+    this.quantityLabels = []
+    for (let i = 0; i < MAX_DISPLAY_ITEMS; i++) {
+      const qtyLabel = this.scene.add.text(0, 0, '', {
+        fontSize: '10px',
+        color: '#ffffff',
+        fontFamily: 'monospace',
+      })
+      qtyLabel.setOrigin(1, 1)
+      qtyLabel.setVisible(false)
+      this.add(qtyLabel)
+      this.quantityLabels.push(qtyLabel)
+    }
 
     // --- Slots ---
     for (let i = 0; i < MAX_DISPLAY_ITEMS; i++) {
@@ -120,9 +135,11 @@ export default class InventoryDock extends Phaser.GameObjects.Container {
       }
 
       const sprite = this.itemSprites[index]
+      const qtyLabel = this.quantityLabels[index]
 
       // Hide all by default
       if (sprite) sprite.setVisible(false)
+      if (qtyLabel) qtyLabel.setVisible(false)
 
       if (!item) return
 
@@ -133,6 +150,16 @@ export default class InventoryDock extends Phaser.GameObjects.Container {
         sprite.setTexture(item.spriteConfig.texture).setFrame(item.spriteConfig.frame).setVisible(true)
       } else if (isSeed) {
         sprite.setTexture(item.spriteConfig.texture).setFrame(item.spriteConfig.frame).setVisible(true)
+      }
+
+      // Show quantity if > 1
+      if (item.quantity && item.quantity > 1) {
+        qtyLabel.setText(String(item.quantity))
+        qtyLabel.setPosition(
+          (index + 1) * ITEM_SLOT_SIZE + DOCK_PADDING,
+          ITEM_SLOT_SIZE + DOCK_PADDING
+        )
+        qtyLabel.setVisible(true)
       }
     })
 

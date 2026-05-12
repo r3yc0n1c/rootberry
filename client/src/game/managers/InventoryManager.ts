@@ -14,10 +14,10 @@ export default class InventoryManager extends Phaser.Events.EventEmitter {
     // Populate with some dummy items for now
     this.addItem(new Item('item_hoe', 'Hoe', 'A basic hoe.', { texture: 'tools', frame: 0 }));
     this.addItem(new Item('item_watering_can', 'Watering Can', 'Water your crops.', { texture: 'tools', frame: 1 }));
-    this.addItem(new Item('item_carrot_seed', 'Carrot Seed', 'Plant to grow carrots.', { texture: 'crops', frame: 9 }));
-    this.addItem(new Item('item_cabbage_seed', 'Cabbage Seed', 'Plant to grow cabbage.', { texture: 'crops', frame: 8 }));
-    this.addItem(new Item('item_pumpkin_seed', 'Pumpkin Seed', 'Plant to grow pumpkins.', { texture: 'crops', frame: 9 }));
-    this.addItem(new Item('item_strawberry_seed', 'Strawberry Seed', 'Plant to grow strawberries.', { texture: 'crops', frame: 10 }));
+    this.addItem(new Item('item_carrot_seed', 'Carrot Seed', 'Plant to grow carrots.', { texture: 'crops', frame: 9 }, 0x888888, 5));
+    this.addItem(new Item('item_cabbage_seed', 'Cabbage Seed', 'Plant to grow cabbage.', { texture: 'crops', frame: 8 }, 0x888888, 5));
+    this.addItem(new Item('item_pumpkin_seed', 'Pumpkin Seed', 'Plant to grow pumpkins.', { texture: 'crops', frame: 9 }, 0x888888, 5));
+    this.addItem(new Item('item_strawberry_seed', 'Strawberry Seed', 'Plant to grow strawberries.', { texture: 'crops', frame: 10 }, 0x888888, 5));
   }
 
   addItem(item: Item) {
@@ -28,6 +28,18 @@ export default class InventoryManager extends Phaser.Events.EventEmitter {
   removeItem(itemId: string) {
     this.inventory = this.inventory.filter(item => item.id !== itemId);
     this.emit('inventoryChanged');
+  }
+
+  consumeItem(itemId: string) {
+    const item = this.inventory.find(i => i.id === itemId)
+    if (item) {
+      if (item.quantity > 1) {
+        item.quantity--
+      } else {
+        this.inventory = this.inventory.filter(i => i.id !== itemId)
+      }
+      this.emit('inventoryChanged')
+    }
   }
 
   getInventory(): Item[] {

@@ -20,9 +20,10 @@ var upgrader = websocket.Upgrader{
 var manager = game.NewRoomManager()
 
 type Message struct {
-	Type string `json:"type"`
-	X    int    `json:"x"`
-	Y    int    `json:"y"`
+  Type      string `json:"type"`
+  X         int    `json:"x"`
+  Y         int    `json:"y"`
+  CropType  string `json:"cropType"`
 }
 
 func HandleConnection(w http.ResponseWriter, r *http.Request) {
@@ -101,73 +102,90 @@ func handleAction(room *game.Room, p *game.Player, m Message) {
 			p.Y = m.Y
 		}
 
-	case "till":
-		if !isValidTile(m.X, m.Y) {
-			return
-		}
+case "till":
+ 		if !isValidTile(m.X, m.Y) {
+ 			return
+ 		}
 
-		tile := room.World.Tiles[m.Y][m.X]
+ 		tile := room.World.Tiles[m.Y][m.X]
 
-		// only farm tiles can be tilled
-		if tile.Type == "farm" {
-			tile.Type = "tilled"
-			tile.Watered = false
-		}
+ 		// only farm tiles can be tilled
+ 		if tile.Type == "farm" {
+ 			tile.Type = "tilled"
+ 			tile.Watered = false
+ 			log.Printf("[SERVER] Player %s tilled tile (%d, %d)", p.ID, m.X, m.Y)
+ 		}
 
-		p.State = "hoe"
-		room.BroadcastLocked()
+ 		p.State = "hoe"
+ 		room.BroadcastLocked()
 
-	case "water":
-		if !isValidTile(m.X, m.Y) {
-			return
-		}
+case "water":
+ 		if !isValidTile(m.X, m.Y) {
+ 			return
+ 		}
 
-		tile := room.World.Tiles[m.Y][m.X]
+ 		tile := room.World.Tiles[m.Y][m.X]
 
-		// only tilled soil can be watered
-		if tile.Type == "tilled" {
-			tile.Watered = true
-		}
+ 		// only tilled soil can be watered
+ 		if tile.Type == "tilled" {
+ 			tile.Watered = true
+ 			log.Printf("[SERVER] Player %s watered tile (%d, %d)", p.ID, m.X, m.Y)
+ 		}
 
-		p.State = "water"
-		room.BroadcastLocked()
+ 		p.State = "water"
+ 		room.BroadcastLocked()
 
-	case "plant":
-		if !isValidTile(m.X, m.Y) {
-			return
-		}
+case "plant":
+ 		if !isValidTile(m.X, m.Y) {
+ 			return
+ 		}
 
-		tile := room.World.Tiles[m.Y][m.X]
+ 		tile := room.World.Tiles[m.Y][m.X]
 
-		// must be tilled + watered
-		if tile.Type == "tilled" &&
-			tile.Watered &&
-			tile.Crop == nil {
+ 		// must be tilled (no water required for planting)
+ 		if tile.Type == "tilled" && tile.Crop == nil {
 
-			tile.Crop = game.NewCrop("carrot")
-		}
+ 			// Reset watered state so growth doesn't immediately increment
+ 			tile.Watered = false
 
-		p.State = "idle"
-		room.BroadcastLocked()
+ 			// Map client item id to crop type
+ 			cropType := "carrot"
+ 			switch m.CropType {
+ 			case "item_carrot_seed":
+ 				cropType = "carrot"
+ 			case "item_cabbage_seed":
+ 				cropType = "cabbage"
+ 			case "item_pumpkin_seed":
+ 				cropType = "pumpkin"
+ 			case "item_strawberry_seed":
+ 				cropType = "strawberry"
+ 			}
+ 			tile.Crop = game.NewCrop(cropType)
+ 			log.Printf("[SERVER] Player %s planted %s at (%d, %d)", p.ID, cropType, m.X, m.Y)
+ 		}
 
-	case "harvest":
-		if !isValidTile(m.X, m.Y) {
-			return
-		}
+ 		p.State = "idle"
+ 		room.BroadcastLocked()
 
-		tile := room.World.Tiles[m.Y][m.X]
+case "harvest":
+ 		if !isValidTile(m.X, m.Y) {
+ 			return
+ 		}
 
-		if tile.Crop != nil &&
-			tile.Crop.Growth >= tile.Crop.MaxGrowth {
+ 		tile := room.World.Tiles[m.Y][m.X]
 
-			p.Money += 10
+ 		if tile.Crop != nil &&
+ 			tile.Crop.Growth >= tile.Crop.MaxGrowth {
 
-			tile.Crop = nil
-			tile.Watered = false
-			tile.Type = "tilled"
-		}
+ 			log.Printf("[SERVER] Player %s harvested %s at (%d, %d)", p.ID, tile.Crop.Type, m.X, m.Y)
+ 			p.Money += 10
 
-		p.State = "idle"
-		room.BroadcastLocked()
+ 			tile.Crop = nil
+ 			tile.Watered = false
+ 			tile.Type = "tilled"
+ 		}
+
+ 		p.State = "idle"
+ 		room.BroadcastLocked()
 	}
 }

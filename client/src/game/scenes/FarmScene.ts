@@ -686,6 +686,7 @@ export default class FarmScene extends Phaser.Scene {
       (equipped === 'item_hoe' || equipped === null) &&
       tile.type === 'farm'
     ) {
+      console.log(`[Action] Tilling tile at (${targetTile.x}, ${targetTile.y})`)
       this.isActing = true
       player.play(`bunny-hoe-${player.lastDir}`)
 
@@ -712,6 +713,7 @@ export default class FarmScene extends Phaser.Scene {
     // WATER
     // =====================================
     if (equipped === 'item_watering_can' && tile.type === 'tilled' && !tile.watered) {
+      console.log(`[Action] Watering tile at (${targetTile.x}, ${targetTile.y})`)
       this.isActing = true
       player.play(`bunny-wateringcan-${player.lastDir}`)
 
@@ -741,20 +743,22 @@ export default class FarmScene extends Phaser.Scene {
       equipped &&
       equipped.includes('seed') &&
       tile.type === 'tilled' &&
-      tile.watered &&
       !tile.crop
     ) {
+      console.log(`[Action] Planting ${equipped} at (${targetTile.x}, ${targetTile.y})`)
       this.isActing = true
 
       NetworkManager.send({
         type: 'plant',
         x: targetTile.x,
         y: targetTile.y,
-        cropType: equipped, // send which seed was used
+        cropType: equipped,
       })
 
+      // Consume the seed after successful action
       this.time.delayedCall(200, () => {
         this.isActing = false
+        this.inventoryManager.consumeItem(equipped)
       })
 
       return
@@ -764,6 +768,7 @@ export default class FarmScene extends Phaser.Scene {
     // HARVEST (no tool required)
     // =====================================
     if (tile.crop && tile.crop.growth >= tile.crop.maxGrowth) {
+      console.log(`[Action] Harvesting crop at (${targetTile.x}, ${targetTile.y})`)
       this.isActing = true
 
       NetworkManager.send({
@@ -775,6 +780,10 @@ export default class FarmScene extends Phaser.Scene {
       this.time.delayedCall(200, () => {
         this.isActing = false
       })
+    } else if (equipped && equipped.includes('seed') && tile.type === 'tilled' && tile.crop) {
+      console.log(`[Action] Cannot plant: tile already has crop at (${targetTile.x}, ${targetTile.y})`)
+    } else if (equipped && equipped.includes('seed') && tile.type !== 'tilled') {
+      console.log(`[Action] Cannot plant: tile not tilled at (${targetTile.x}, ${targetTile.y})`)
     }
   }
 
@@ -795,7 +804,32 @@ export default class FarmScene extends Phaser.Scene {
         }
 
         if (tile.crop) {
-          this.cropLayer.putTileAt(1, x, y)
+          const cropType = tile.crop.type
+          const isWatered = tile.watered
+          const growth = tile.crop.growth
+          let tileId: number
+
+          // Show sapling if growth > 0 (has been watered at least once)
+          if (growth > 0) {
+            // Sapling grown (watered)
+            switch (cropType) {
+              case 'carrot': tileId = 25; break
+              case 'cabbage': tileId = 26; break
+              case 'pumpkin': tileId = 27; break
+              case 'strawberry': tileId = 28; break
+              default: tileId = 1
+            }
+          } else {
+            // Seed planted (not yet watered)
+            switch (cropType) {
+              case 'carrot': tileId = 13; break
+              case 'cabbage': tileId = 14; break
+              case 'pumpkin': tileId = 15; break
+              case 'strawberry': tileId = 16; break
+              default: tileId = 1
+            }
+          }
+          this.cropLayer.putTileAt(tileId, x, y)
         } else {
           this.cropLayer.removeTileAt(x, y)
         }
